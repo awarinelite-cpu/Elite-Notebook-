@@ -55,7 +55,14 @@ export default function DrivePanel() {
       return
     }
     if (!res.ok) {
-      setError('Could not load your Drive files.')
+      let detail = `HTTP ${res.status}`
+      try {
+        const body = await res.json()
+        detail = body?.error?.message || detail
+      } catch (e) {
+        // response wasn't JSON — keep the HTTP status as the detail
+      }
+      setError(`Could not load your Drive files: ${detail}`)
       return
     }
     const data = await res.json()
@@ -120,7 +127,7 @@ export default function DrivePanel() {
       )}
       {error && error !== 'expired' && <p className="drive-error">{error}</p>}
 
-      {files === null && error !== 'expired' && <p className="drive-loading">Loading your Drive…</p>}
+      {files === null && !error && <p className="drive-loading">Loading your Drive…</p>}
 
       {files && files.length === 0 && <p className="drive-loading">No files found.</p>}
 
