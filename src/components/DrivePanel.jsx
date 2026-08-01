@@ -125,11 +125,11 @@ export default function DrivePanel() {
       {files && files.length === 0 && <p className="drive-loading">No files found.</p>}
 
       {files && files.length > 0 && (
-        <div className="drive-grid">
+        <div className="note-grid drive-grid">
           {files.map((f) => (
             <button
               key={f.id}
-              className="drive-file"
+              className="note-card drive-card"
               onClick={() => {
                 const url = previewUrl(f)
                 if (url) setPreviewing({ url, name: f.name })
@@ -137,33 +137,33 @@ export default function DrivePanel() {
               }}
             >
               {f.thumbnailLink ? (
-                <img className="drive-file-thumb" src={f.thumbnailLink} alt="" loading="lazy" />
+                <img src={f.thumbnailLink} alt="" loading="lazy" />
               ) : (
-                <img className="drive-file-icon" src={f.iconLink} alt="" loading="lazy" />
+                <div className="drive-card-icon-wrap">
+                  <img className="drive-card-icon" src={f.iconLink} alt="" loading="lazy" />
+                </div>
               )}
-              <span className="drive-file-name">{f.name}</span>
-              <span className="drive-file-meta">{formatSize(f.size)}</span>
+              <h3>{f.name}</h3>
+              <p className="drive-card-meta">{formatSize(f.size)}</p>
             </button>
           ))}
         </div>
       )}
 
       {previewing && (
-        <div className="drive-preview-backdrop" onClick={() => setPreviewing(null)}>
-          <div className="drive-preview-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="drive-preview-header">
-              <span className="drive-preview-title">{previewing.name}</span>
-              <button className="icon-toggle-btn" onClick={() => setPreviewing(null)} aria-label="Close preview">
-                <IconClose />
-              </button>
-            </div>
-            <iframe
-              className="drive-preview-frame"
-              src={previewing.url}
-              title={previewing.name}
-              allow="autoplay"
-            />
+        <div className="drive-preview-full">
+          <div className="drive-preview-header">
+            <button className="icon-toggle-btn" onClick={() => setPreviewing(null)} aria-label="Back">
+              <IconClose />
+            </button>
+            <span className="drive-preview-title">{previewing.name}</span>
           </div>
+          <iframe
+            className="drive-preview-frame"
+            src={previewing.url}
+            title={previewing.name}
+            allow="autoplay"
+          />
         </div>
       )}
     </div>
