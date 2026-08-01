@@ -48,10 +48,11 @@ export default function Fab({ onSelect, onPickImage }) {
         ref={fileInput}
         type="file"
         accept="image/*"
+        multiple
         hidden
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) onPickImage(file)
+          const files = Array.from(e.target.files || [])
+          if (files.length) onPickImage(files)
           e.target.value = ''
         }}
       />

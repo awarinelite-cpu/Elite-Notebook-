@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { NOTE_COLORS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose } from './Icons.jsx'
+import ImageLightbox from './ImageLightbox.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
 
@@ -16,6 +17,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
   const [images, setImages] = useState(base.images || [])
   const [uploading, setUploading] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
@@ -66,12 +68,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   }
 
   async function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
     setUploading(true)
-    const url = await onUploadImage(file)
-    if (url) setImages((imgs) => [...imgs, url])
-    else onUploadError?.()
+    const urls = await Promise.all(files.map((f) => onUploadImage(f)))
+    const ok = urls.filter(Boolean)
+    if (ok.length) setImages((imgs) => [...imgs, ...ok])
+    if (ok.length < files.length) onUploadError?.()
     setUploading(false)
     e.target.value = ''
   }
@@ -91,7 +94,21 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         {images.length > 0 && (
           <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
             {images.map((src, i) => (
-              <img key={i} src={src} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
+              <div key={i} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
+                <img
+                  src={src}
+                  alt=""
+                  style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }}
+                  onClick={() => setLightboxIndex(i)}
+                />
+                <button
+                  className="thumb-remove"
+                  title="Remove image"
+                  onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
+                >
+                  <IconClose width="12" height="12" />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -172,7 +189,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
             {uploading ? '...' : <IconImage width="18" height="18" />}
           </button>
-          <input ref={fileInput} type="file" accept="image/*" hidden onChange={handleFile} />
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={handleFile} />
           {!isNew && (
             <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
               <IconTrash width="18" height="18" />
@@ -183,6 +200,15 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           </button>
         </div>
       </div>
+
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
+      )}
     </div>
   )
 }

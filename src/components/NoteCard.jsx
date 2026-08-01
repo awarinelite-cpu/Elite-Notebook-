@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { NOTE_COLORS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose } from './Icons.jsx'
+import ImageLightbox from './ImageLightbox.jsx'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -9,8 +11,11 @@ function formatReminder(ts) {
 export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive, onTrash, onRestore, onDeleteForever, onToggleChecklistItem, view }) {
   const overdue = note.reminderAt && new Date(note.reminderAt) < new Date()
   const noteLabels = (note.labels || []).map((id) => labels.find((l) => l.id === id)).filter(Boolean)
+  const images = note.images || []
+  const [lightboxIndex, setLightboxIndex] = useState(null)
 
   return (
+    <>
     <div
       className="note-card"
       style={{ background: NOTE_COLORS[note.color] || NOTE_COLORS.default }}
@@ -24,7 +29,29 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
 
       {note.title && <h3>{note.title}</h3>}
 
-      {note.images?.[0] && <img src={note.images[0]} alt="" />}
+      {images.length === 1 && (
+        <img
+          src={images[0]}
+          alt=""
+          onClick={(e) => { e.stopPropagation(); setLightboxIndex(0) }}
+        />
+      )}
+
+      {images.length > 1 && (
+        <div
+          className={`note-card-collage collage-${Math.min(images.length, 4)}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {images.slice(0, 4).map((src, i) => (
+            <div key={i} className="collage-tile" onClick={() => setLightboxIndex(i)}>
+              <img src={src} alt="" />
+              {i === 3 && images.length > 4 && (
+                <div className="collage-more">+{images.length - 4}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {note.text && <p>{note.text}</p>}
 
@@ -76,5 +103,15 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         )}
       </div>
     </div>
+
+    {lightboxIndex !== null && (
+      <ImageLightbox
+        images={images}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
+    )}
+    </>
   )
 }

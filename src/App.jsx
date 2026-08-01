@@ -83,13 +83,14 @@ export default function App() {
     // 'drawing' and 'audio' aren't supported yet — quietly no-op
   }
 
-  async function handlePickImage(file) {
-    const url = await uploadImage(file)
-    if (!url) {
-      setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")
-      return
+  async function handlePickImage(files) {
+    const list = Array.isArray(files) ? files : [files]
+    const urls = await Promise.all(list.map((f) => uploadImage(f)))
+    const ok = urls.filter(Boolean)
+    if (ok.length < list.length) {
+      setToast("Some images couldn't upload — check Firebase Storage is set up and its rules are published.")
     }
-    setDraft({ images: [url] })
+    if (ok.length) setDraft((d) => ({ ...(d || {}), images: [...((d && d.images) || []), ...ok] }))
   }
 
   return (
