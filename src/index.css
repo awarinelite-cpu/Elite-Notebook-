@@ -295,7 +295,7 @@ a {
 /* ---------- Note grid ---------- */
 .note-grid {
   columns: 4 240px;
-  column-gap: 16px;
+  column-gap: 10px;
 }
 
 .note-grid.list-view {
@@ -304,11 +304,11 @@ a {
 }
 
 @media (max-width: 900px) {
-  .note-grid { columns: 2 180px; }
+  .note-grid { columns: 2 180px; column-gap: 10px; }
 }
 @media (max-width: 560px) {
-  .note-grid { columns: 1; }
-  .content { padding: 16px 12px 100px; }
+  .note-grid { columns: 2; column-gap: 8px; }
+  .content { padding: 12px 10px 100px; }
   .topbar { padding: 10px 10px; gap: 8px; }
   .search-field { padding: 8px 14px; }
   .hamburger-btn, .icon-toggle-btn { width: 34px; height: 34px; font-size: 15px; }
@@ -317,10 +317,10 @@ a {
 
 .note-card {
   break-inside: avoid;
-  margin-bottom: 16px;
-  border-radius: 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  padding: 16px;
+  padding: 14px;
   position: relative;
   box-shadow: none;
   transition: box-shadow 0.15s ease;
@@ -347,9 +347,9 @@ a {
 }
 
 .note-card img {
-  width: calc(100% + 32px);
-  margin: -16px -16px 8px;
-  border-radius: 12px 12px 0 0;
+  width: calc(100% + 28px);
+  margin: -14px -14px 8px;
+  border-radius: 14px 14px 0 0;
   display: block;
   max-width: none;
 }
@@ -740,10 +740,10 @@ a {
 }
 
 .drive-card-icon-wrap {
-  width: calc(100% + 32px);
-  margin: -16px -16px 8px;
+  width: calc(100% + 28px);
+  margin: -14px -14px 8px;
   padding: 28px 0;
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px 14px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -798,10 +798,10 @@ a {
 /* ---------- Note card image collage ---------- */
 .note-card-collage {
   display: grid;
-  gap: 2px;
-  width: calc(100% + 32px);
-  margin: -16px -16px 8px;
-  border-radius: 12px 12px 0 0;
+  gap: 3px;
+  width: calc(100% + 28px);
+  margin: -14px -14px 8px;
+  border-radius: 14px 14px 0 0;
   overflow: hidden;
 }
 
@@ -810,6 +810,7 @@ a {
 .collage-3 { grid-template-columns: 1fr 1fr; }
 .collage-3 .collage-tile:first-child { grid-row: span 2; }
 .collage-4 { grid-template-columns: 1fr 1fr; }
+.collage-5, .collage-6 { grid-template-columns: 1fr 1fr 1fr; }
 
 .collage-tile {
   position: relative;

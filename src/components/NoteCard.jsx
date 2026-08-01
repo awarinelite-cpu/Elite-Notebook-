@@ -39,14 +39,14 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
 
       {images.length > 1 && (
         <div
-          className={`note-card-collage collage-${Math.min(images.length, 4)}`}
+          className={`note-card-collage collage-${Math.min(images.length, 6)}`}
           onClick={(e) => e.stopPropagation()}
         >
-          {images.slice(0, 4).map((src, i) => (
+          {images.slice(0, 6).map((src, i) => (
             <div key={i} className="collage-tile" onClick={() => setLightboxIndex(i)}>
               <img src={src} alt="" />
-              {i === 3 && images.length > 4 && (
-                <div className="collage-more">+{images.length - 4}</div>
+              {i === 5 && images.length > 6 && (
+                <div className="collage-more">+{images.length - 6}</div>
               )}
             </div>
           ))}
