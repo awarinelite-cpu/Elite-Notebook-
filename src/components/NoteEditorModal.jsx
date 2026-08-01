@@ -4,7 +4,7 @@ import { IconChecklist, IconImage, IconTrash } from './Icons.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
 
-export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage }) {
+export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError }) {
   const isNew = !note
   const base = note || { ...BLANK, ...(initial || {}) }
 
@@ -71,6 +71,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     setUploading(true)
     const url = await onUploadImage(file)
     if (url) setImages((imgs) => [...imgs, url])
+    else onUploadError?.()
     setUploading(false)
     e.target.value = ''
   }

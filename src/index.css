@@ -275,6 +275,23 @@ a {
   margin-bottom: 16px;
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: #323232;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 60;
+  max-width: 90vw;
+  text-align: center;
+  cursor: pointer;
+}
+
 /* ---------- Note grid ---------- */
 .note-grid {
   columns: 4 240px;

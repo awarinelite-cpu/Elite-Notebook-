@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './context/AuthContext.jsx'
 import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
@@ -11,6 +11,7 @@ import LabelManager from './components/LabelManager.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
 import Fab from './components/Fab.jsx'
+import Toast from './components/Toast.jsx'
 
 const PANEL_VIEWS = ['labels', 'settings', 'help']
 
@@ -26,6 +27,13 @@ export default function App() {
   const [sortAsc, setSortAsc] = useState(false)
   const [editingNote, setEditingNote] = useState(null)
   const [draft, setDraft] = useState(null) // { initial } when creating, or null
+  const [toast, setToast] = useState(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const filtered = useMemo(() => {
     let list = notes
@@ -76,7 +84,11 @@ export default function App() {
 
   async function handlePickImage(file) {
     const url = await uploadImage(file)
-    setDraft({ images: url ? [url] : [] })
+    if (!url) {
+      setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")
+      return
+    }
+    setDraft({ images: [url] })
   }
 
   return (
@@ -121,6 +133,8 @@ export default function App() {
 
       {view === 'notes' && <Fab onSelect={handleFabSelect} onPickImage={handlePickImage} />}
 
+      <Toast message={toast} onClose={() => setToast(null)} />
+
       {editingNote && (
         <NoteEditorModal
           note={editingNote}
@@ -129,6 +143,7 @@ export default function App() {
           onSave={updateNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
+          onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
         />
       )}
 
@@ -141,6 +156,7 @@ export default function App() {
           onCreate={createNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
+          onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
         />
       )}
     </div>
