@@ -30,6 +30,10 @@
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -409,8 +413,14 @@ a {
 
 /* ---------- Empty state ---------- */
 .empty-state {
+  min-height: calc(100vh - 140px);
+  min-height: calc(100dvh - 140px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: 120px 20px 60px;
+  padding: 20px;
   color: var(--ink-soft);
 }
 
