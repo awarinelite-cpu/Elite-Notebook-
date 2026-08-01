@@ -10,10 +10,11 @@ import NoteEditorModal from './components/NoteEditorModal.jsx'
 import LabelManager from './components/LabelManager.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
+import DrivePanel from './components/DrivePanel.jsx'
 import Fab from './components/Fab.jsx'
 import Toast from './components/Toast.jsx'
 
-const PANEL_VIEWS = ['labels', 'settings', 'help']
+const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive']
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -114,6 +115,7 @@ export default function App() {
         {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
         {view === 'settings' && <SettingsPanel />}
         {view === 'help' && <HelpPanel />}
+        {view === 'drive' && <DrivePanel />}
         {!PANEL_VIEWS.includes(view) && (
           <NoteGrid
             notes={filtered}

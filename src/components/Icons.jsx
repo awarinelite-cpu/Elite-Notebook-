@@ -63,6 +63,9 @@ export function IconUnpin(p) { return (
 export function IconRestore(p) { return (
   <svg viewBox="0 0 24 24" width="18" height="18" {...base} {...p}><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg>
 )}
+export function IconDrive(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M8.5 3h7l6 10.5-3.5 6h-12l-3.5-6L8.5 3Z" /><path d="M8.5 3 15 14.5M15.5 19.5H4.5" /></svg>
+)}
 export function IconSignOut(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></svg>
 )}

@@ -16,6 +16,11 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
+googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly')
+// Forces Google to always return a fresh access token (with the Drive scope)
+// on sign-in, rather than silently reusing an old session token that may
+// have been granted before Drive access was requested.
+googleProvider.setCustomParameters({ prompt: 'consent' })
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 export default app
