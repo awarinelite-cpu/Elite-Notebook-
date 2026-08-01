@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { NOTE_COLORS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
+import ImageEditor from './ImageEditor.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
 
@@ -18,6 +19,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [images, setImages] = useState(base.images || [])
   const [uploading, setUploading] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [editingImage, setEditingImage] = useState(null) // index of image being edited
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
@@ -79,6 +81,16 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     e.target.value = ''
   }
 
+  async function handleEditSave(blob) {
+    setUploading(true)
+    const file = new File([blob], `edited-${Date.now()}.jpg`, { type: 'image/jpeg' })
+    const url = await onUploadImage(file)
+    setUploading(false)
+    setEditingImage(null)
+    if (url) setImages((imgs) => imgs.map((src, i) => (i === editingImage ? url : src)))
+    else onUploadError?.()
+  }
+
   return (
     <div className="modal-backdrop" onClick={handleClose}>
       <div className="modal-card" style={{ background: NOTE_COLORS[color] }} onClick={(e) => e.stopPropagation()}>
@@ -107,6 +119,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                   onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
                 >
                   <IconClose width="12" height="12" />
+                </button>
+                <button
+                  className="thumb-edit"
+                  title="Edit image"
+                  onClick={() => setEditingImage(i)}
+                >
+                  <IconEdit width="12" height="12" />
                 </button>
               </div>
             ))}
@@ -207,6 +226,14 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
+        />
+      )}
+
+      {editingImage !== null && (
+        <ImageEditor
+          src={images[editingImage]}
+          onCancel={() => setEditingImage(null)}
+          onSave={handleEditSave}
         />
       )}
     </div>
