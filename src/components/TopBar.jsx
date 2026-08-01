@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext.jsx'
+import { IconMenu, IconSearch, IconGrid, IconList, IconSort } from './Icons.jsx'
 
 export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc }) {
   const { user } = useAuth()
@@ -7,11 +8,11 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
   return (
     <header className="topbar">
       <button className="hamburger-btn" onClick={onMenuClick} aria-label="Open menu">
-        &#9776;
+        <IconMenu />
       </button>
 
       <div className="search-field">
-        <span>&#128269;</span>
+        <IconSearch style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
         <input
           type="text"
           placeholder="Search Keep"
@@ -26,14 +27,14 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
           title={listView ? 'Grid view' : 'List view'}
           onClick={() => setListView((v) => !v)}
         >
-          {listView ? '\u25A6' : '\u2637'}
+          {listView ? <IconGrid /> : <IconList />}
         </button>
         <button
           className="icon-toggle-btn"
           title="Sort by last edited"
           onClick={() => setSortAsc((v) => !v)}
         >
-          {sortAsc ? '\u2191\u2193' : '\u2193\u2191'}
+          <IconSort />
         </button>
         <div className="user-chip">
           {user?.photoURL ? (

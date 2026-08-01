@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { NOTE_COLORS } from '../constants.js'
+import { IconChecklist, IconImage, IconTrash } from './Icons.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
 
-export default function NoteEditorModal({ note, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage }) {
+export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage }) {
   const isNew = !note
-  const base = note || BLANK
+  const base = note || { ...BLANK, ...(initial || {}) }
 
   const [title, setTitle] = useState(base.title || '')
   const [text, setText] = useState(base.text || '')
@@ -165,15 +166,15 @@ export default function NoteEditorModal({ note, labels, onClose, onSave, onCreat
 
         <div className="composer-row">
           <button className="icon-btn" onClick={() => setIsChecklist((v) => !v)} title="Toggle checklist">
-            &#9745;
+            <IconChecklist width="18" height="18" />
           </button>
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
-            {uploading ? '...' : '\u{1F5BC}'}
+            {uploading ? '...' : <IconImage width="18" height="18" />}
           </button>
           <input ref={fileInput} type="file" accept="image/*" hidden onChange={handleFile} />
           {!isNew && (
             <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
-              &#128465;
+              <IconTrash width="18" height="18" />
             </button>
           )}
           <button className="pill-btn" style={{ marginLeft: 'auto' }} onClick={handleClose}>

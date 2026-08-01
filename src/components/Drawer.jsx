@@ -1,35 +1,55 @@
-import { NAV_ITEMS } from '../constants.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { IconBulb, IconBell, IconPlus, IconArchive, IconTrash, IconSettings, IconHelp } from './Icons.jsx'
 
 export default function Drawer({ open, view, setView, onClose }) {
-  const { logout } = useAuth()
   if (!open) return null
+
+  function go(id) {
+    setView(id)
+    onClose()
+  }
 
   return (
     <>
       <div className="drawer-backdrop" onClick={onClose} />
       <nav className="drawer">
         <div className="drawer-brand">
-          <div className="drawer-brand-mark">EN</div>
-          <span>Elite Notebook</span>
+          <span className="brand-elite">Elite</span>
+          <span className="brand-notebook">Notebook</span>
         </div>
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            className={`drawer-item ${view === item.id ? 'active' : ''}`}
-            onClick={() => {
-              setView(item.id)
-              onClose()
-            }}
-          >
-            <span className="drawer-icon">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-        <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0' }} />
-        <button className="drawer-item" onClick={logout}>
-          <span className="drawer-icon">&#8618;</span>
-          Sign out
+
+        <button className={`drawer-item ${view === 'notes' ? 'active' : ''}`} onClick={() => go('notes')}>
+          <IconBulb className="drawer-icon-svg" />
+          Notes
+        </button>
+        <button className={`drawer-item ${view === 'reminders' ? 'active' : ''}`} onClick={() => go('reminders')}>
+          <IconBell className="drawer-icon-svg" />
+          Reminders
+        </button>
+        <button className="drawer-item" onClick={() => go('labels')}>
+          <IconPlus className="drawer-icon-svg" />
+          Create new label
+        </button>
+
+        <div className="drawer-gap" />
+
+        <button className={`drawer-item ${view === 'archive' ? 'active' : ''}`} onClick={() => go('archive')}>
+          <IconArchive className="drawer-icon-svg" />
+          Archive
+        </button>
+        <button className={`drawer-item ${view === 'trash' ? 'active' : ''}`} onClick={() => go('trash')}>
+          <IconTrash className="drawer-icon-svg" />
+          Trash
+        </button>
+
+        <div className="drawer-gap" />
+
+        <button className={`drawer-item ${view === 'settings' ? 'active' : ''}`} onClick={() => go('settings')}>
+          <IconSettings className="drawer-icon-svg" />
+          Settings
+        </button>
+        <button className={`drawer-item ${view === 'help' ? 'active' : ''}`} onClick={() => go('help')}>
+          <IconHelp className="drawer-icon-svg" />
+          Help &amp; feedback
         </button>
       </nav>
     </>

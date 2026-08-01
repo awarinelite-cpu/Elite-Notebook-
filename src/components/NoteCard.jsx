@@ -1,4 +1,5 @@
 import { NOTE_COLORS } from '../constants.js'
+import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose } from './Icons.jsx'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -12,12 +13,12 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   return (
     <div
       className="note-card"
-      style={{ background: NOTE_COLORS[note.color] || NOTE_COLORS.paper }}
+      style={{ background: NOTE_COLORS[note.color] || NOTE_COLORS.default }}
       onClick={() => onEdit(note)}
     >
       {note.reminderAt && (
         <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
-          &#9200; {formatReminder(note.reminderAt)}
+          <IconBell width="12" height="12" /> {formatReminder(note.reminderAt)}
         </div>
       )}
 
@@ -54,22 +55,22 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         {view !== 'trash' ? (
           <>
             <button className="icon-btn" title={note.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePin(note)}>
-              {note.pinned ? '\u{1F4CC}' : '\u{1F4CD}'}
+              {note.pinned ? <IconUnpin /> : <IconPin />}
             </button>
             <button className="icon-btn" title={note.archived ? 'Unarchive' : 'Archive'} onClick={() => onArchive(note)}>
-              &#11015;
+              <IconArchive width="18" height="18" />
             </button>
             <button className="icon-btn" title="Move to trash" onClick={() => onTrash(note)}>
-              &#128465;
+              <IconTrash width="18" height="18" />
             </button>
           </>
         ) : (
           <>
             <button className="icon-btn" title="Restore" onClick={() => onRestore(note)}>
-              &#8635;
+              <IconRestore />
             </button>
             <button className="icon-btn" title="Delete forever" onClick={() => onDeleteForever(note.id)}>
-              &#10006;
+              <IconClose width="18" height="18" />
             </button>
           </>
         )}

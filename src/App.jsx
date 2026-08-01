@@ -8,7 +8,11 @@ import TopBar from './components/TopBar.jsx'
 import NoteGrid from './components/NoteGrid.jsx'
 import NoteEditorModal from './components/NoteEditorModal.jsx'
 import LabelManager from './components/LabelManager.jsx'
+import SettingsPanel from './components/SettingsPanel.jsx'
+import HelpPanel from './components/HelpPanel.jsx'
 import Fab from './components/Fab.jsx'
+
+const PANEL_VIEWS = ['labels', 'settings', 'help']
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -21,7 +25,7 @@ export default function App() {
   const [listView, setListView] = useState(false)
   const [sortAsc, setSortAsc] = useState(false)
   const [editingNote, setEditingNote] = useState(null)
-  const [creating, setCreating] = useState(false)
+  const [draft, setDraft] = useState(null) // { initial } when creating, or null
 
   const filtered = useMemo(() => {
     let list = notes
@@ -64,6 +68,17 @@ export default function App() {
     updateNote(note.id, { checklist: next })
   }
 
+  function handleFabSelect(type) {
+    if (type === 'text') setDraft({})
+    else if (type === 'list') setDraft({ checklist: [{ id: crypto.randomUUID(), text: '', done: false }] })
+    // 'drawing' and 'audio' aren't supported yet — quietly no-op
+  }
+
+  async function handlePickImage(file) {
+    const url = await uploadImage(file)
+    setDraft({ images: url ? [url] : [] })
+  }
+
   return (
     <div className="app-shell">
       <Drawer open={drawerOpen} view={view} setView={setView} onClose={() => setDrawerOpen(false)} />
@@ -79,9 +94,10 @@ export default function App() {
       />
 
       <div className="content">
-        {view === 'labels' ? (
-          <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />
-        ) : (
+        {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
+        {view === 'settings' && <SettingsPanel />}
+        {view === 'help' && <HelpPanel />}
+        {!PANEL_VIEWS.includes(view) && (
           <NoteGrid
             notes={filtered}
             labels={labels}
@@ -98,7 +114,7 @@ export default function App() {
         )}
       </div>
 
-      {view === 'notes' && <Fab onClick={() => setCreating(true)} />}
+      {view === 'notes' && <Fab onSelect={handleFabSelect} onPickImage={handlePickImage} />}
 
       {editingNote && (
         <NoteEditorModal
@@ -111,11 +127,12 @@ export default function App() {
         />
       )}
 
-      {creating && (
+      {draft && (
         <NoteEditorModal
           note={null}
+          initial={draft}
           labels={labels}
-          onClose={() => setCreating(false)}
+          onClose={() => setDraft(null)}
           onCreate={createNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
