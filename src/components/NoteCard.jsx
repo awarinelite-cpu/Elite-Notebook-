@@ -15,8 +15,6 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
       style={{ background: NOTE_COLORS[note.color] || NOTE_COLORS.paper }}
       onClick={() => onEdit(note)}
     >
-      {note.pinned && <div className="pin-mark" title="Pinned">&#128204;</div>}
-
       {note.reminderAt && (
         <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
           &#9200; {formatReminder(note.reminderAt)}
@@ -56,7 +54,7 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         {view !== 'trash' ? (
           <>
             <button className="icon-btn" title={note.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePin(note)}>
-              &#128204;
+              {note.pinned ? '\u{1F4CC}' : '\u{1F4CD}'}
             </button>
             <button className="icon-btn" title={note.archived ? 'Unarchive' : 'Archive'} onClick={() => onArchive(note)}>
               &#11015;

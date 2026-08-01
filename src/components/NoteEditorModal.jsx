@@ -1,34 +1,48 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { NOTE_COLORS } from '../constants.js'
 
-export default function NoteEditorModal({ note, labels, onClose, onSave, onDeleteForever }) {
-  const [title, setTitle] = useState(note.title || '')
-  const [text, setText] = useState(note.text || '')
-  const [checklist, setChecklist] = useState(note.checklist || [])
-  const [color, setColor] = useState(note.color || 'paper')
-  const [selectedLabels, setSelectedLabels] = useState(note.labels || [])
+const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
+
+export default function NoteEditorModal({ note, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage }) {
+  const isNew = !note
+  const base = note || BLANK
+
+  const [title, setTitle] = useState(base.title || '')
+  const [text, setText] = useState(base.text || '')
+  const [checklist, setChecklist] = useState(base.checklist || [])
+  const [isChecklist, setIsChecklist] = useState((base.checklist || []).length > 0)
+  const [color, setColor] = useState(base.color || 'default')
+  const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
+  const [images, setImages] = useState(base.images || [])
+  const [uploading, setUploading] = useState(false)
   const [reminderAt, setReminderAt] = useState(
-    note.reminderAt ? new Date(note.reminderAt).toISOString().slice(0, 16) : ''
+    base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
+  const fileInput = useRef(null)
 
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'Escape') handleClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, text, checklist, color, selectedLabels, reminderAt])
-
-  function handleClose() {
-    onSave(note.id, {
+  function buildPatch() {
+    return {
       title,
       text,
       checklist,
       color,
       labels: selectedLabels,
+      images,
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
-    })
+    }
+  }
+
+  function handleClose() {
+    const patch = buildPatch()
+    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && patch.images.length === 0
+
+    if (isNew) {
+      if (!isEmpty) onCreate(patch)
+    } else if (!isEmpty) {
+      onSave(note.id, patch)
+    } else {
+      onDeleteForever(note.id)
+    }
     onClose()
   }
 
@@ -50,6 +64,16 @@ export default function NoteEditorModal({ note, labels, onClose, onSave, onDelet
     setChecklist(checklist.filter((_, i) => i !== idx))
   }
 
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const url = await onUploadImage(file)
+    if (url) setImages((imgs) => [...imgs, url])
+    setUploading(false)
+    e.target.value = ''
+  }
+
   return (
     <div className="modal-backdrop" onClick={handleClose}>
       <div className="modal-card" style={{ background: NOTE_COLORS[color] }} onClick={(e) => e.stopPropagation()}>
@@ -58,49 +82,53 @@ export default function NoteEditorModal({ note, labels, onClose, onSave, onDelet
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600 }}
+          autoFocus={isNew}
+          style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600 }}
         />
 
-        {note.images?.length > 0 && (
+        {images.length > 0 && (
           <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
-            {note.images.map((src, i) => (
-              <img key={i} src={src} alt="" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8 }} />
+            {images.map((src, i) => (
+              <img key={i} src={src} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
             ))}
           </div>
         )}
 
-        <textarea
-          placeholder="Note"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={4}
-          style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 14, marginTop: 10, resize: 'vertical', fontFamily: 'inherit' }}
-        />
-
-        <div style={{ marginTop: 10 }}>
-          {checklist.map((item, idx) => (
-            <div className="checklist-item" key={item.id}>
-              <input type="checkbox" checked={item.done} onChange={(e) => updateItem(idx, { done: e.target.checked })} />
-              <input
-                type="text"
-                value={item.text}
-                onChange={(e) => updateItem(idx, { text: e.target.value })}
-                style={{ border: 'none', background: 'none', outline: 'none', flex: 1, fontSize: 13.5 }}
-              />
-              <button className="icon-btn" onClick={() => removeItem(idx)} title="Remove item">&#10005;</button>
-            </div>
-          ))}
-          <button className="text-btn" onClick={addChecklistItem}>+ Add item</button>
-        </div>
+        {!isChecklist ? (
+          <textarea
+            placeholder="Take a note..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={4}
+            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 14, marginTop: 10, resize: 'vertical', fontFamily: 'inherit' }}
+          />
+        ) : (
+          <div style={{ marginTop: 10 }}>
+            {checklist.map((item, idx) => (
+              <div className="checklist-item" key={item.id}>
+                <input type="checkbox" checked={item.done} onChange={(e) => updateItem(idx, { done: e.target.checked })} />
+                <input
+                  type="text"
+                  placeholder="List item"
+                  value={item.text}
+                  onChange={(e) => updateItem(idx, { text: e.target.value })}
+                  style={{ border: 'none', background: 'none', outline: 'none', flex: 1, fontSize: 13.5 }}
+                />
+                <button className="icon-btn" onClick={() => removeItem(idx)} title="Remove item">&#10005;</button>
+              </div>
+            ))}
+            <button className="text-btn" onClick={addChecklistItem}>+ Add item</button>
+          </div>
+        )}
 
         <div style={{ marginTop: 14 }}>
-          <label style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Reminder</label>
+          <label style={{ fontSize: 11, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Reminder</label>
           <br />
           <input
             type="datetime-local"
             value={reminderAt}
             onChange={(e) => setReminderAt(e.target.value)}
-            style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--rule)', fontSize: 13 }}
+            style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)' }}
           />
         </div>
 
@@ -111,9 +139,9 @@ export default function NoteEditorModal({ note, labels, onClose, onSave, onDelet
                 key={l.id}
                 className="label-chip"
                 style={{
+                  background: selectedLabels.includes(l.id) ? '#1A73E8' : 'var(--surface-soft)',
+                  color: selectedLabels.includes(l.id) ? '#fff' : 'var(--ink-soft)',
                   border: 'none',
-                  background: selectedLabels.includes(l.id) ? 'var(--forest)' : 'var(--paper-alt)',
-                  color: selectedLabels.includes(l.id) ? 'var(--paper)' : 'var(--ink-soft)',
                 }}
                 onClick={() => toggleLabel(l.id)}
               >
@@ -136,17 +164,21 @@ export default function NoteEditorModal({ note, labels, onClose, onSave, onDelet
         </div>
 
         <div className="composer-row">
-          <button
-            className="icon-btn"
-            title="Delete forever"
-            onClick={() => {
-              onDeleteForever(note.id)
-              onClose()
-            }}
-          >
-            &#128465;
+          <button className="icon-btn" onClick={() => setIsChecklist((v) => !v)} title="Toggle checklist">
+            &#9745;
           </button>
-          <button className="pill-btn" onClick={handleClose}>Close</button>
+          <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
+            {uploading ? '...' : '\u{1F5BC}'}
+          </button>
+          <input ref={fileInput} type="file" accept="image/*" hidden onChange={handleFile} />
+          {!isNew && (
+            <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
+              &#128465;
+            </button>
+          )}
+          <button className="pill-btn" style={{ marginLeft: 'auto' }} onClick={handleClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>

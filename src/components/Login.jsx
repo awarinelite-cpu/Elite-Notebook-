@@ -6,7 +6,7 @@ export default function Login() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="spine-logo">EN</div>
+        <div className="drawer-brand-mark">EN</div>
         <h1>The Elite Notebook</h1>
         <p>Capture notes, checklists, and images. Link your documents in when you need them.</p>
         <button className="google-btn" onClick={login}>
