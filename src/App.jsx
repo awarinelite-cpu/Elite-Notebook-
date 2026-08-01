@@ -16,7 +16,7 @@ const PANEL_VIEWS = ['labels', 'settings', 'help']
 
 export default function App() {
   const { user, loading } = useAuth()
-  const { notes, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
+  const { notes, error, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
   const { labels, createLabel, deleteLabel } = useLabels()
 
   const [view, setView] = useState('notes')
@@ -94,6 +94,11 @@ export default function App() {
       />
 
       <div className="content">
+        {error && (
+          <div className="error-banner">
+            Couldn't reach your notes: {error} — check your Firestore rules are published.
+          </div>
+        )}
         {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
         {view === 'settings' && <SettingsPanel />}
         {view === 'help' && <HelpPanel />}

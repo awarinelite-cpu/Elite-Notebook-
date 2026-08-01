@@ -265,6 +265,16 @@ a {
   margin: 4px 0 12px;
 }
 
+.error-banner {
+  background: #FCE8E6;
+  color: #C5221F;
+  border: 1px solid #F6AEA9;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
 /* ---------- Note grid ---------- */
 .note-grid {
   columns: 4 240px;
