@@ -7,6 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'The Elite Notebook',
@@ -35,32 +41,41 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 60 * 60 * 24 * 365,
+        // Registers this installed app as a target in the OS share sheet
+        // (Android's "Share to…" list, and equivalents elsewhere). The
+        // service worker at src/sw.js handles the POST to this action URL.
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [
+              {
+                name: 'files',
+                accept: [
+                  'image/*',
+                  'application/pdf',
+                  '.doc',
+                  '.docx',
+                  '.xls',
+                  '.xlsx',
+                  '.ppt',
+                  '.pptx',
+                  '.txt',
+                  '.csv',
+                  'text/*',
+                ],
               },
-            },
+            ],
           },
-        ],
+        },
       },
       devOptions: {
         enabled: true,
+        type: 'module',
       },
     }),
   ],

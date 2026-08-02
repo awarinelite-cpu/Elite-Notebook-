@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
-import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose } from './Icons.jsx'
+import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
@@ -65,6 +65,24 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
           {note.audio.map((src, i) => (
             <audio key={i} controls src={src} style={{ width: '100%', height: 32 }} />
+          ))}
+        </div>
+      )}
+
+      {note.files?.length > 0 && (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
+          {note.files.map((f, i) => (
+            <a
+              key={i}
+              href={f.url}
+              target="_blank"
+              rel="noreferrer"
+              className="audio-clip-row"
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              <IconFileDoc width="16" height="16" />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+            </a>
           ))}
         </div>
       )}

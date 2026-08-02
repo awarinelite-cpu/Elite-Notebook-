@@ -65,6 +65,7 @@ export function useNotes() {
         checklist: data.checklist || [],
         images: data.images || [],
         audio: data.audio || [],
+        files: data.files || [],
         color: data.color || 'default',
         background: data.background || 'none',
         labels: data.labels || [],

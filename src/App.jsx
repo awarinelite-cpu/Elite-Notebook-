@@ -15,6 +15,7 @@ import Fab from './components/Fab.jsx'
 import DrawingCanvas from './components/DrawingCanvas.jsx'
 import AudioRecorder from './components/AudioRecorder.jsx'
 import Toast from './components/Toast.jsx'
+import { takePendingShare } from './shareTargetDb.js'
 
 const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive']
 
@@ -38,6 +39,32 @@ export default function App() {
     const t = setTimeout(() => setToast(null), 5000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // Someone shared a file/link/text to the installed app from the OS share
+  // sheet. The service worker stashed it in IndexedDB and redirected here
+  // with ?shared=1 — pick it up, open the editor with it attached, and
+  // clean the URL so a refresh doesn't reprocess it.
+  useEffect(() => {
+    if (!user) return
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('shared')) return
+    window.history.replaceState({}, '', window.location.pathname)
+    ;(async () => {
+      const share = await takePendingShare()
+      if (!share) return
+      const files = share.files || []
+      const imageFiles = files.filter((f) => f.type?.startsWith('image/'))
+      const docFiles = files.filter((f) => !f.type?.startsWith('image/'))
+      const text = [share.text, share.url].filter(Boolean).join('\n')
+      setDraft((d) => ({
+        ...(d || {}),
+        title: (d && d.title) || share.title || '',
+        text: (d && d.text) || text,
+        pendingFiles: [...((d && d.pendingFiles) || []), ...imageFiles],
+        pendingDocFiles: [...((d && d.pendingDocFiles) || []), ...docFiles],
+      }))
+    })()
+  }, [user])
 
   const filtered = useMemo(() => {
     let list = notes

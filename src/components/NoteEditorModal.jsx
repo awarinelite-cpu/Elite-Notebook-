@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
 import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
-const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], reminderAt: null }
+const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null }
 
 // An image slot is either a finished string URL, or a placeholder object
 // `{ id, previewUrl, uploading: true }` shown instantly (with a spinner)
@@ -17,6 +17,12 @@ function srcOf(slot) {
 }
 function isUploading(slot) {
   return typeof slot !== 'string'
+}
+function formatBytes(bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError }) {
@@ -34,6 +40,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
   const [images, setImages] = useState(base.images || [])
   const [audioClips, setAudioClips] = useState(base.audio || [])
+  const [attachments, setAttachments] = useState(base.files || [])
   const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | null
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [editingImage, setEditingImage] = useState(null) // index of image being edited
@@ -41,15 +48,19 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
   const fileInput = useRef(null)
+  const docInput = useRef(null)
   const uploading = images.some(isUploading)
   const audioUploading = audioClips.some(isUploading)
+  const docsUploading = attachments.some((a) => a.uploading)
 
-  // Images (and audio) picked before the modal even opened — e.g. from the
-  // FAB — upload through this same placeholder pipeline, so they behave
-  // identically to ones added from inside the editor.
+  // Images, audio, and documents picked before the modal even opened — e.g.
+  // from the FAB, or from the OS share sheet — upload through this same
+  // placeholder pipeline, so they behave identically to ones added from
+  // inside the editor.
   useEffect(() => {
     if (base.pendingFiles?.length) uploadFiles(base.pendingFiles)
     if (base.pendingAudioFiles?.length) uploadAudioClips(base.pendingAudioFiles)
+    if (base.pendingDocFiles?.length) uploadAttachments(base.pendingDocFiles)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -63,13 +74,16 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       labels: selectedLabels,
       images: images.filter((img) => typeof img === 'string'),
       audio: audioClips.filter((clip) => typeof clip === 'string'),
+      files: attachments.filter((a) => !a.uploading).map((a) => ({ url: a.url, name: a.name, size: a.size, type: a.type })),
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
     }
   }
 
   function handleClose() {
     const patch = buildPatch()
-    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && images.length === 0 && audioClips.length === 0
+    const isEmpty =
+      !patch.title && !patch.text && patch.checklist.length === 0 &&
+      images.length === 0 && audioClips.length === 0 && attachments.length === 0
 
     if (isNew) {
       if (!isEmpty) onCreate(patch)
@@ -171,6 +185,43 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     const file = new File([blob], `voice-memo-${Date.now()}.${ext}`, { type: blob.type || 'audio/webm' })
     setSubTool(null)
     uploadAudioClips([file])
+  }
+
+  // Generic (non-image, non-audio) file attachments — PDFs, Word docs,
+  // spreadsheets, anything shared in from the OS share sheet or picked
+  // manually. Same placeholder-then-swap pipeline, but placeholders carry
+  // name/size/type since there's no thumbnail to show.
+  async function uploadAttachments(files) {
+    const placeholders = files.map((f) => ({
+      id: crypto.randomUUID(),
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      uploading: true,
+    }))
+    setAttachments((atts) => [...atts, ...placeholders])
+
+    const results = await Promise.all(
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+    )
+
+    setAttachments((atts) => {
+      let next = atts
+      for (const { ph, url } of results) {
+        next = url
+          ? next.map((a) => (a.id === ph.id ? { ...a, url, uploading: false } : a))
+          : next.filter((a) => a.id !== ph.id)
+      }
+      return next
+    })
+    if (results.some((r) => !r.url)) onUploadError?.()
+  }
+
+  function handleDocFile(e) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!files.length) return
+    uploadAttachments(files)
   }
 
   async function handleEditSave(blob) {
@@ -279,6 +330,35 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           </div>
         )}
 
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
+            {attachments.map((a) => (
+              <div key={a.id || a.url} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
+                {a.uploading ? (
+                  <>
+                    <span className="spinner" />
+                    <span className="audio-clip-label">Uploading {a.name}…</span>
+                  </>
+                ) : (
+                  <>
+                    <IconFileDoc width="16" height="16" />
+                    <a href={a.url} target="_blank" rel="noreferrer" className="audio-clip-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.name} {a.size ? `· ${formatBytes(a.size)}` : ''}
+                    </a>
+                  </>
+                )}
+                <button
+                  className="icon-btn"
+                  title="Remove file"
+                  onClick={() => setAttachments((atts) => atts.filter((x) => x !== a))}
+                >
+                  <IconClose width="14" height="14" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {!isChecklist ? (
           <textarea
             placeholder="Take a note..."
@@ -375,6 +455,10 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           <button className="icon-btn" onClick={() => setSubTool('audio')} title="Record voice memo" disabled={audioUploading}>
             {audioUploading ? '...' : <IconMic width="18" height="18" />}
           </button>
+          <button className="icon-btn" onClick={() => docInput.current?.click()} title="Attach file" disabled={docsUploading}>
+            {docsUploading ? '...' : <IconAttachment width="18" height="18" />}
+          </button>
+          <input ref={docInput} type="file" multiple hidden onChange={handleDocFile} />
           {!isNew && (
             <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
               <IconTrash width="18" height="18" />
