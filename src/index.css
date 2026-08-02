@@ -466,9 +466,18 @@ a {
   margin-left: -6px;
 }
 
-.note-card:hover .note-actions,
-.note-card:focus-within .note-actions {
+.note-actions.visible {
   opacity: 1;
+}
+
+/* Hover-to-reveal only applies on devices with a real mouse/trackpad.
+   On touch screens this is skipped so icons only appear via long press
+   (handled in JS), which stops accidental taps from hitting delete. */
+@media (hover: hover) and (pointer: fine) {
+  .note-card:hover .note-actions,
+  .note-card:focus-within .note-actions {
+    opacity: 1;
+  }
 }
 
 .share-copied-tip {

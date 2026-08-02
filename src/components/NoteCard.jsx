@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
@@ -18,6 +18,77 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [sharing, setSharing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [actionsVisible, setActionsVisible] = useState(false)
+  const cardRef = useRef(null)
+  const longPressTimer = useRef(null)
+  const longPressFired = useRef(false)
+  const touchMoved = useRef(false)
+
+  const LONG_PRESS_MS = 450
+  const MOVE_TOLERANCE = 10
+  const touchStartPos = useRef({ x: 0, y: 0 })
+
+  function clearLongPressTimer() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  function handleTouchStart(e) {
+    touchMoved.current = false
+    longPressFired.current = false
+    const touch = e.touches?.[0]
+    if (touch) touchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    clearLongPressTimer()
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      setActionsVisible(true)
+      if (navigator.vibrate) navigator.vibrate(10)
+    }, LONG_PRESS_MS)
+  }
+
+  function handleTouchMove(e) {
+    const touch = e.touches?.[0]
+    if (touch) {
+      const dx = touch.clientX - touchStartPos.current.x
+      const dy = touch.clientY - touchStartPos.current.y
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_TOLERANCE) {
+        touchMoved.current = true
+        clearLongPressTimer()
+      }
+    }
+  }
+
+  function handleTouchEnd() {
+    clearLongPressTimer()
+  }
+
+  function handleCardClick() {
+    // A long press already revealed the action icons: swallow this tap
+    // instead of also opening the editor, and don't reopen the note.
+    if (longPressFired.current) {
+      longPressFired.current = false
+      return
+    }
+    if (actionsVisible) {
+      setActionsVisible(false)
+      return
+    }
+    onEdit(note)
+  }
+
+  // Dismiss the action icons when the person taps/clicks anywhere outside this card.
+  useEffect(() => {
+    if (!actionsVisible) return
+    function handleOutside(e) {
+      if (cardRef.current && !cardRef.current.contains(e.target)) {
+        setActionsVisible(false)
+      }
+    }
+    document.addEventListener('pointerdown', handleOutside)
+    return () => document.removeEventListener('pointerdown', handleOutside)
+  }, [actionsVisible])
 
   async function handleShare(e) {
     e.stopPropagation()
@@ -76,6 +147,7 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   return (
     <>
     <div
+      ref={cardRef}
       className="note-card"
       style={{
         background:
@@ -83,7 +155,12 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
             ? NOTE_BACKGROUNDS[note.background]
             : NOTE_COLORS[note.color] || NOTE_COLORS.default,
       }}
-      onClick={() => onEdit(note)}
+      onClick={handleCardClick}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {note.reminderAt && (
         <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
@@ -168,7 +245,11 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         </div>
       )}
 
-      <div className="note-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
+      <div
+        className={`note-actions ${actionsVisible ? 'visible' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: 'relative' }}
+      >
         <button className="icon-btn" title="Share" onClick={handleShare} disabled={sharing}>
           <IconShare width="18" height="18" />
         </button>
