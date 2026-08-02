@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
-import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc } from './Icons.jsx'
+import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
@@ -16,6 +16,62 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   const noteLabels = (note.labels || []).map((id) => labels.find((l) => l.id === id)).filter(Boolean)
   const images = note.images || []
   const [lightboxIndex, setLightboxIndex] = useState(null)
+  const [sharing, setSharing] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  async function handleShare(e) {
+    e.stopPropagation()
+    if (sharing) return
+    setSharing(true)
+
+    const parts = []
+    if (note.title) parts.push(note.title)
+    if (note.text) parts.push(note.text)
+    if (note.checklist?.length) {
+      parts.push(note.checklist.map((c) => `${c.done ? '\u2611' : '\u2610'} ${c.text}`).join('\n'))
+    }
+    if (note.files?.length) {
+      parts.push(note.files.map((f) => f.url).join('\n'))
+    }
+    const shareText = parts.join('\n\n')
+    const shareTitle = note.title || 'Note'
+
+    try {
+      // Best effort: pull the note's images in as real files so the share
+      // sheet can attach them (Photos, WhatsApp, etc.), not just their URLs.
+      let files = []
+      if (navigator.canShare && images.length) {
+        try {
+          files = await Promise.all(
+            images.slice(0, 5).map(async (url, i) => {
+              const res = await fetch(url)
+              const blob = await res.blob()
+              return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
+            })
+          )
+        } catch {
+          files = []
+        }
+      }
+
+      if (navigator.share) {
+        if (files.length && navigator.canShare?.({ files })) {
+          await navigator.share({ title: shareTitle, text: shareText, files })
+        } else {
+          await navigator.share({ title: shareTitle, text: shareText })
+        }
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText || shareTitle)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1800)
+      }
+    } catch (err) {
+      // AbortError just means the person closed the share sheet — not an error worth surfacing.
+      if (err?.name !== 'AbortError') console.error('share failed:', err)
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <>
@@ -112,7 +168,11 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         </div>
       )}
 
-      <div className="note-actions" onClick={(e) => e.stopPropagation()}>
+      <div className="note-actions" onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
+        <button className="icon-btn" title="Share" onClick={handleShare} disabled={sharing}>
+          <IconShare width="18" height="18" />
+        </button>
+        {copied && <span className="share-copied-tip">Copied to clipboard</span>}
         {view !== 'trash' ? (
           <>
             <button className="icon-btn" title={note.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePin(note)}>
