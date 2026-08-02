@@ -1,8 +1,10 @@
 import { useAuth } from '../context/AuthContext.jsx'
-import { IconMenu, IconSearch, IconGrid, IconList, IconSort } from './Icons.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
+import { IconMenu, IconSearch, IconGrid, IconList, IconSort, IconMoon, IconSun } from './Icons.jsx'
 
 export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc }) {
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const initial = (user?.displayName || user?.email || '?').charAt(0).toUpperCase()
 
   return (
@@ -22,6 +24,13 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
       </div>
 
       <div className="topbar-icons">
+        <button
+          className="icon-toggle-btn"
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <IconSun /> : <IconMoon />}
+        </button>
         <button
           className="icon-toggle-btn"
           title={listView ? 'Grid view' : 'List view'}

@@ -51,6 +51,12 @@ export function IconChecklist(p) { return (
 export function IconText(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M5 6h14M12 6v14" /></svg>
 )}
+export function IconMoon(p) { return (
+  <svg viewBox="0 0 24 24" width="19" height="19" {...base} {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
+)}
+export function IconSun(p) { return (
+  <svg viewBox="0 0 24 24" width="19" height="19" {...base} {...p}><circle cx="12" cy="12" r="4.5" /><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+)}
 export function IconEdit(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M4 20l1-4 11-11 3 3-11 11-4 1Z" /><path d="M14 6.5 17.5 10" /></svg>
 )}

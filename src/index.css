@@ -26,6 +26,30 @@
   --card-clay: #E8DCC8;
 }
 
+[data-theme="dark"] {
+  --bg: #1B1C1F;
+  --surface: #26272B;
+  --surface-soft: #303136;
+  --ink: #E8EAED;
+  --ink-soft: #9AA0A6;
+  --border: #3C3D40;
+  --accent: #FDD663;
+  --fab: #2D3B4E;
+  --fab-icon: #8AB4F8;
+  --shadow: rgba(0, 0, 0, 0.4);
+
+  --card-default: #26272B;
+  --card-coral: #5C2B29;
+  --card-peach: #4D3818;
+  --card-sand: #4A4423;
+  --card-sage: #334425;
+  --card-fog: #16433C;
+  --card-storm: #1F3A5C;
+  --card-dusk: #3B2C4A;
+  --card-blossom: #4B2738;
+  --card-clay: #3D3527;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -45,6 +69,7 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 button, input, textarea {

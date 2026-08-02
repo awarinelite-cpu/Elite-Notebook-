@@ -1,8 +1,10 @@
 import { useAuth } from '../context/AuthContext.jsx'
-import { IconSignOut } from './Icons.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
+import { IconSignOut, IconMoon, IconSun } from './Icons.jsx'
 
 export default function SettingsPanel() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <div style={{ maxWidth: 420 }}>
@@ -30,6 +32,25 @@ export default function SettingsPanel() {
           <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{user?.email}</div>
         </div>
       </div>
+
+      <button
+        onClick={toggleTheme}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          width: '100%',
+          padding: '12px 16px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          fontSize: 14,
+          marginBottom: 10,
+        }}
+      >
+        {theme === 'dark' ? <IconSun /> : <IconMoon />}
+        {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+      </button>
 
       <button
         onClick={logout}

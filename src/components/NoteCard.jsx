@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { NOTE_COLORS } from '../constants.js'
+import { getNoteColors } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -9,6 +10,8 @@ function formatReminder(ts) {
 }
 
 export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive, onTrash, onRestore, onDeleteForever, onToggleChecklistItem, view }) {
+  const { theme } = useTheme()
+  const NOTE_COLORS = getNoteColors(theme)
   const overdue = note.reminderAt && new Date(note.reminderAt) < new Date()
   const noteLabels = (note.labels || []).map((id) => labels.find((l) => l.id === id)).filter(Boolean)
   const images = note.images || []

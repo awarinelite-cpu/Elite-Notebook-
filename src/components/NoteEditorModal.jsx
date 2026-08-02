@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react'
-import { NOTE_COLORS } from '../constants.js'
+import { getNoteColors } from '../constants.js'
 import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
 
 export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError }) {
+  const { theme } = useTheme()
+  const NOTE_COLORS = getNoteColors(theme)
   const isNew = !note
   const base = note || { ...BLANK, ...(initial || {}) }
 
