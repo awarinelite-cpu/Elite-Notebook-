@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { getNoteColors } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit } from './Icons.jsx'
+import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
+import DrawingCanvas from './DrawingCanvas.jsx'
+import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
-const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
+const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], reminderAt: null }
 
 // An image slot is either a finished string URL, or a placeholder object
 // `{ id, previewUrl, uploading: true }` shown instantly (with a spinner)
@@ -28,8 +30,11 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [checklist, setChecklist] = useState(base.checklist || [])
   const [isChecklist, setIsChecklist] = useState((base.checklist || []).length > 0)
   const [color, setColor] = useState(base.color || 'default')
+  const [background, setBackground] = useState(base.background || 'none')
   const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
   const [images, setImages] = useState(base.images || [])
+  const [audioClips, setAudioClips] = useState(base.audio || [])
+  const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | null
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [editingImage, setEditingImage] = useState(null) // index of image being edited
   const [reminderAt, setReminderAt] = useState(
@@ -37,11 +42,14 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   )
   const fileInput = useRef(null)
   const uploading = images.some(isUploading)
+  const audioUploading = audioClips.some(isUploading)
 
-  // Images picked before the modal even opened (e.g. from the FAB) upload
-  // through this same placeholder pipeline, so they behave identically.
+  // Images (and audio) picked before the modal even opened — e.g. from the
+  // FAB — upload through this same placeholder pipeline, so they behave
+  // identically to ones added from inside the editor.
   useEffect(() => {
     if (base.pendingFiles?.length) uploadFiles(base.pendingFiles)
+    if (base.pendingAudioFiles?.length) uploadAudioClips(base.pendingAudioFiles)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -51,15 +59,17 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       text,
       checklist,
       color,
+      background,
       labels: selectedLabels,
       images: images.filter((img) => typeof img === 'string'),
+      audio: audioClips.filter((clip) => typeof clip === 'string'),
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
     }
   }
 
   function handleClose() {
     const patch = buildPatch()
-    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && images.length === 0
+    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && images.length === 0 && audioClips.length === 0
 
     if (isNew) {
       if (!isEmpty) onCreate(patch)
@@ -124,6 +134,45 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     uploadFiles(files)
   }
 
+  // Same placeholder-then-swap pipeline as uploadFiles, for voice memos.
+  async function uploadAudioClips(files) {
+    const placeholders = files.map((f) => ({
+      id: crypto.randomUUID(),
+      previewUrl: URL.createObjectURL(f),
+      uploading: true,
+    }))
+    setAudioClips((clips) => [...clips, ...placeholders])
+
+    const results = await Promise.all(
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+    )
+
+    setAudioClips((clips) => {
+      let next = clips
+      for (const { ph, url } of results) {
+        next = url
+          ? next.map((slot) => (typeof slot !== 'string' && slot.id === ph.id ? url : slot))
+          : next.filter((slot) => !(typeof slot !== 'string' && slot.id === ph.id))
+      }
+      return next
+    })
+    results.forEach(({ ph }) => URL.revokeObjectURL(ph.previewUrl))
+    if (results.some((r) => !r.url)) onUploadError?.()
+  }
+
+  function handleDrawingSave(blob) {
+    const file = new File([blob], `drawing-${Date.now()}.png`, { type: 'image/png' })
+    setSubTool(null)
+    uploadFiles([file])
+  }
+
+  function handleAudioSave(blob) {
+    const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'
+    const file = new File([blob], `voice-memo-${Date.now()}.${ext}`, { type: blob.type || 'audio/webm' })
+    setSubTool(null)
+    uploadAudioClips([file])
+  }
+
   async function handleEditSave(blob) {
     const idx = editingImage
     const original = images[idx]
@@ -140,7 +189,11 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
 
   return (
     <div className="modal-backdrop" onClick={handleClose}>
-      <div className="modal-card" style={{ background: NOTE_COLORS[color] }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-card"
+        style={{ background: background !== 'none' ? NOTE_BACKGROUNDS[background] : NOTE_COLORS[color] }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <input
           type="text"
           placeholder="Title"
@@ -190,6 +243,36 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                       <IconEdit width="12" height="12" />
                     </button>
                   )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {audioClips.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
+            {audioClips.map((clip, i) => {
+              const pending = isUploading(clip)
+              return (
+                <div key={pending ? clip.id : `${clip}-${i}`} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
+                  {pending ? (
+                    <>
+                      <span className="spinner" />
+                      <span className="audio-clip-label">Uploading voice memo…</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconMic width="16" height="16" />
+                      <audio controls src={clip} style={{ flex: 1, height: 32 }} />
+                    </>
+                  )}
+                  <button
+                    className="icon-btn"
+                    title="Remove voice memo"
+                    onClick={() => setAudioClips((clips) => clips.filter((_, idx) => idx !== i))}
+                  >
+                    <IconClose width="14" height="14" />
+                  </button>
                 </div>
               )
             })}
@@ -257,10 +340,23 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           {Object.entries(NOTE_COLORS).map(([name, hex]) => (
             <button
               key={name}
-              className={`swatch ${color === name ? 'selected' : ''}`}
+              className={`swatch ${background === 'none' && color === name ? 'selected' : ''}`}
               style={{ background: hex }}
-              onClick={() => setColor(name)}
+              onClick={() => { setColor(name); setBackground('none') }}
               aria-label={name}
+            />
+          ))}
+        </div>
+
+        <div className="bg-swatches">
+          {Object.entries(NOTE_BACKGROUNDS).map(([name, css]) => (
+            <button
+              key={name}
+              className={`bg-swatch ${background === name ? 'selected' : ''}`}
+              style={{ background: css }}
+              onClick={() => setBackground(name)}
+              aria-label={NOTE_BACKGROUND_LABELS[name]}
+              title={NOTE_BACKGROUND_LABELS[name]}
             />
           ))}
         </div>
@@ -273,6 +369,12 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
             {uploading ? '...' : <IconImage width="18" height="18" />}
           </button>
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={handleFile} />
+          <button className="icon-btn" onClick={() => setSubTool('drawing')} title="Add drawing">
+            <IconDrawing width="18" height="18" />
+          </button>
+          <button className="icon-btn" onClick={() => setSubTool('audio')} title="Record voice memo" disabled={audioUploading}>
+            {audioUploading ? '...' : <IconMic width="18" height="18" />}
+          </button>
           {!isNew && (
             <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
               <IconTrash width="18" height="18" />
@@ -299,6 +401,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           onCancel={() => setEditingImage(null)}
           onSave={handleEditSave}
         />
+      )}
+
+      {subTool === 'drawing' && (
+        <DrawingCanvas onCancel={() => setSubTool(null)} onSave={handleDrawingSave} />
+      )}
+      {subTool === 'audio' && (
+        <AudioRecorder onCancel={() => setSubTool(null)} onSave={handleAudioSave} />
       )}
     </div>
   )

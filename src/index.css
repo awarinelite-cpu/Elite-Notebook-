@@ -666,6 +666,14 @@ a {
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pill-btn:disabled {
+  opacity: 0.5;
 }
 
 .pill-btn:hover {
@@ -688,6 +696,132 @@ a {
   border-top: 1px solid var(--border);
 }
 
+/* ---------- Wallpaper backgrounds ---------- */
+.bg-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.bg-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background-size: cover;
+}
+
+.bg-swatch.selected {
+  outline: 2px solid #1A73E8;
+  outline-offset: 2px;
+}
+
+/* ---------- Voice memo clip row ---------- */
+.audio-clip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.audio-clip-label {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Drawing canvas ---------- */
+.drawing-card {
+  max-width: 520px;
+}
+
+.drawing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drawing-canvas-wrap {
+  background: #fff;
+  height: 50vh;
+  max-height: 420px;
+  margin: 10px 14px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  touch-action: none;
+  border: 1px solid var(--border);
+}
+
+.drawing-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* ---------- Audio recorder ---------- */
+.audio-card {
+  max-width: 380px;
+}
+
+.audio-recorder-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 36px 20px;
+  min-height: 200px;
+}
+
+.audio-pulse {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--fab);
+  color: #D93025;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: audio-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes audio-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.35); }
+  50% { box-shadow: 0 0 0 14px rgba(217, 48, 37, 0); }
+}
+
+.audio-play-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--fab);
+  color: var(--fab-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audio-timer {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.audio-hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
 /* ---------- Drive panel ---------- */
 .drive-connect {
   max-width: 360px;
@@ -705,6 +839,10 @@ a {
   padding: 10px 22px;
   font-size: 14px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .drive-connect-btn:disabled {

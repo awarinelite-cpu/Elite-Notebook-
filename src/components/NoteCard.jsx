@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getNoteColors } from '../constants.js'
+import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
@@ -21,7 +21,12 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
     <>
     <div
       className="note-card"
-      style={{ background: NOTE_COLORS[note.color] || NOTE_COLORS.default }}
+      style={{
+        background:
+          note.background && note.background !== 'none'
+            ? NOTE_BACKGROUNDS[note.background]
+            : NOTE_COLORS[note.color] || NOTE_COLORS.default,
+      }}
       onClick={() => onEdit(note)}
     >
       {note.reminderAt && (
@@ -52,6 +57,14 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
                 <div className="collage-more">+{images.length - 6}</div>
               )}
             </div>
+          ))}
+        </div>
+      )}
+
+      {note.audio?.length > 0 && (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
+          {note.audio.map((src, i) => (
+            <audio key={i} controls src={src} style={{ width: '100%', height: 32 }} />
           ))}
         </div>
       )}

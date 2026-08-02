@@ -51,6 +51,27 @@ export function IconChecklist(p) { return (
 export function IconText(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M5 6h14M12 6v14" /></svg>
 )}
+export function IconStop(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p} fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+)}
+export function IconPlay(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p} fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z" /></svg>
+)}
+export function IconPause(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p} fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+)}
+export function IconUndo(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M9 7 4 12l5 5" /><path d="M4 12h10a6 6 0 0 1 0 12h-1" /></svg>
+)}
+export function IconEraser(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M18 13 9.5 21.5H5L2.5 19l10-10Z" /><path d="m13 6 5 5" /><path d="M9 21.5h11" /></svg>
+)}
+export function IconWallpaper(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="m3 16 5-5 4 4 5-6 4 5" /></svg>
+)}
+export function IconMic(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+)}
 export function IconMoon(p) { return (
   <svg viewBox="0 0 24 24" width="19" height="19" {...base} {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
 )}

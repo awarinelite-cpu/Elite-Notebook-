@@ -12,6 +12,8 @@ import SettingsPanel from './components/SettingsPanel.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
 import DrivePanel from './components/DrivePanel.jsx'
 import Fab from './components/Fab.jsx'
+import DrawingCanvas from './components/DrawingCanvas.jsx'
+import AudioRecorder from './components/AudioRecorder.jsx'
 import Toast from './components/Toast.jsx'
 
 const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive']
@@ -28,6 +30,7 @@ export default function App() {
   const [sortAsc, setSortAsc] = useState(false)
   const [editingNote, setEditingNote] = useState(null)
   const [draft, setDraft] = useState(null) // { initial } when creating, or null
+  const [activeTool, setActiveTool] = useState(null) // 'drawing' | 'audio' | null
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
@@ -80,7 +83,8 @@ export default function App() {
   function handleFabSelect(type) {
     if (type === 'text') setDraft({})
     else if (type === 'list') setDraft({ checklist: [{ id: crypto.randomUUID(), text: '', done: false }] })
-    // 'drawing' and 'audio' aren't supported yet — quietly no-op
+    else if (type === 'drawing') setActiveTool('drawing')
+    else if (type === 'audio') setActiveTool('audio')
   }
 
   function handlePickImage(files) {
@@ -89,6 +93,19 @@ export default function App() {
     // uploads them itself, instead of us blocking here until they finish.
     const list = Array.isArray(files) ? files : [files]
     setDraft((d) => ({ ...(d || {}), pendingFiles: [...((d && d.pendingFiles) || []), ...list] }))
+  }
+
+  function handleDrawingSave(blob) {
+    const file = new File([blob], `drawing-${Date.now()}.png`, { type: 'image/png' })
+    setActiveTool(null)
+    handlePickImage([file])
+  }
+
+  function handleAudioSave(blob) {
+    const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'
+    const file = new File([blob], `voice-memo-${Date.now()}.${ext}`, { type: blob.type || 'audio/webm' })
+    setActiveTool(null)
+    setDraft((d) => ({ ...(d || {}), pendingAudioFiles: [...((d && d.pendingAudioFiles) || []), file] }))
   }
 
   return (
@@ -133,6 +150,13 @@ export default function App() {
       </div>
 
       {view === 'notes' && <Fab onSelect={handleFabSelect} onPickImage={handlePickImage} />}
+
+      {activeTool === 'drawing' && (
+        <DrawingCanvas onCancel={() => setActiveTool(null)} onSave={handleDrawingSave} />
+      )}
+      {activeTool === 'audio' && (
+        <AudioRecorder onCancel={() => setActiveTool(null)} onSave={handleAudioSave} />
+      )}
 
       <Toast message={toast} onClose={() => setToast(null)} />
 
