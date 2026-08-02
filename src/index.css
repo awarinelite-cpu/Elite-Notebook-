@@ -461,6 +461,7 @@ a {
   align-items: center;
   gap: 2px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.15s ease;
   margin-top: 6px;
   margin-left: -6px;
@@ -468,6 +469,7 @@ a {
 
 .note-actions.visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* Hover-to-reveal only applies on devices with a real mouse/trackpad.
@@ -477,6 +479,7 @@ a {
   .note-card:hover .note-actions,
   .note-card:focus-within .note-actions {
     opacity: 1;
+    pointer-events: auto;
   }
 }
 
