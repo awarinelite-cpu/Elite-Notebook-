@@ -1,10 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
-import { IconSearch, IconClose, IconPlus, IconImage } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList } from './Icons.jsx'
 
 const FILES_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
-const FIELDS = 'files(id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size),nextPageToken'
+const FIELDS =
+  'files(id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size,folderColorRgb),nextPageToken'
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
+const DEFAULT_FOLDER_COLOR = '#8a8f99'
+
+// Matches Google Drive's own folder glyph so folders read the same way they
+// do in the real Drive app — including the color the person picked there.
+function FolderIcon({ color, size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M3 6.5C3 5.67 3.67 5 4.5 5h4.4c.34 0 .67.12.93.34l1.6 1.33c.26.22.6.34.94.34H19.5c.83 0 1.5.67 1.5 1.5v9.17c0 .83-.67 1.5-1.5 1.5h-15C3.67 19.17 3 18.5 3 17.67V6.5Z"
+        fill={color || DEFAULT_FOLDER_COLOR}
+      />
+    </svg>
+  )
+}
+
+function formatModified(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const sameYear = d.getFullYear() === now.getFullYear()
+  return d.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
 // Google's own embeddable preview URLs. These are explicitly designed by
 // Google to be shown in an iframe (unlike a normal drive.google.com link,
@@ -26,7 +49,7 @@ function formatSize(bytes) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const NEW_FIELDS = 'id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size'
+const NEW_FIELDS = 'id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size,folderColorRgb'
 
 async function createDriveFolder(token, name, parentId) {
   const res = await fetch(`${FILES_ENDPOINT}?fields=${NEW_FIELDS}`, {
@@ -115,6 +138,7 @@ export default function DrivePanel() {
   const [newFolderName, setNewFolderName] = useState('')
   const [pendingUploads, setPendingUploads] = useState([]) // [{ id, name }] shown as spinner cards
   const [actionError, setActionError] = useState(null)
+  const [listView, setListView] = useState(false)
   const uploadInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
@@ -257,6 +281,9 @@ export default function DrivePanel() {
           />
         </div>
         <div className="drive-account">
+          <button className="icon-toggle-btn" onClick={() => setListView((v) => !v)} title={listView ? 'Grid view' : 'List view'}>
+            {listView ? <IconGrid /> : <IconList />}
+          </button>
           <span className="drive-account-email" title={email || ''}>{email}</span>
           <button className="text-btn" onClick={disconnect}>Disconnect</button>
         </div>
@@ -332,29 +359,69 @@ export default function DrivePanel() {
       {files && files.length === 0 && pendingUploads.length === 0 && <p className="drive-loading">No files found.</p>}
 
       {((files && files.length > 0) || pendingUploads.length > 0) && (
-        <div className="note-grid drive-grid">
-          {pendingUploads.map((p) => (
-            <div key={p.id} className="note-card drive-card drive-card-uploading">
-              <div className="drive-card-icon-wrap">
+        <div className={listView ? 'drive-list' : 'note-grid drive-grid'}>
+          {pendingUploads.map((p) =>
+            listView ? (
+              <div key={p.id} className="drive-row drive-row-uploading">
                 <span className="spinner" />
-              </div>
-              <h3>{p.name}</h3>
-              <p className="drive-card-meta">Uploading…</p>
-            </div>
-          ))}
-          {files && files.map((f) => (
-            <button key={f.id} className="note-card drive-card" onClick={() => openFile(f)}>
-              {f.thumbnailLink ? (
-                <img src={f.thumbnailLink} alt="" loading="lazy" />
-              ) : (
-                <div className="drive-card-icon-wrap">
-                  <img className="drive-card-icon" src={f.iconLink} alt="" loading="lazy" />
+                <div className="drive-row-text">
+                  <span className="drive-row-name">{p.name}</span>
+                  <span className="drive-row-meta">Uploading…</span>
                 </div>
-              )}
-              <h3>{f.name}</h3>
-              <p className="drive-card-meta">{f.mimeType === FOLDER_MIME ? 'Folder' : formatSize(f.size)}</p>
-            </button>
-          ))}
+              </div>
+            ) : (
+              <div key={p.id} className="note-card drive-card drive-card-uploading">
+                <div className="drive-card-icon-wrap">
+                  <span className="spinner" />
+                </div>
+                <h3>{p.name}</h3>
+                <p className="drive-card-meta">Uploading…</p>
+              </div>
+            )
+          )}
+          {files &&
+            files.map((f) => {
+              const isFolder = f.mimeType === FOLDER_MIME
+              const folderColor = f.folderColorRgb || DEFAULT_FOLDER_COLOR
+
+              if (listView) {
+                return (
+                  <button key={f.id} className="drive-row" onClick={() => openFile(f)}>
+                    {isFolder ? (
+                      <FolderIcon color={folderColor} size={28} />
+                    ) : (
+                      <img className="drive-row-icon" src={f.iconLink} alt="" loading="lazy" />
+                    )}
+                    <div className="drive-row-text">
+                      <span className="drive-row-name">{f.name}</span>
+                      <span className="drive-row-meta">
+                        {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
+                      </span>
+                    </div>
+                  </button>
+                )
+              }
+
+              return (
+                <button key={f.id} className="note-card drive-card" onClick={() => openFile(f)}>
+                  {isFolder ? (
+                    <div className="drive-card-icon-wrap">
+                      <FolderIcon color={folderColor} size={44} />
+                    </div>
+                  ) : f.thumbnailLink ? (
+                    <img src={f.thumbnailLink} alt="" loading="lazy" />
+                  ) : (
+                    <div className="drive-card-icon-wrap">
+                      <img className="drive-card-icon" src={f.iconLink} alt="" loading="lazy" />
+                    </div>
+                  )}
+                  <h3>{f.name}</h3>
+                  <p className="drive-card-meta">
+                    {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
+                  </p>
+                </button>
+              )
+            })}
         </div>
       )}
 
