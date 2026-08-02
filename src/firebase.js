@@ -16,11 +16,10 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
-googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly')
-// Forces Google to always return a fresh access token (with the Drive scope)
-// on sign-in, rather than silently reusing an old session token that may
-// have been granted before Drive access was requested.
-googleProvider.setCustomParameters({ prompt: 'consent' })
+// This provider is only for the app's own sign-in. Google Drive access is
+// requested separately (see src/lib/googleDrive.js) so it never forces a
+// Drive consent prompt on ordinary app login, and so Drive can be connected
+// to a different Google account than the one signed into the app.
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 export default app

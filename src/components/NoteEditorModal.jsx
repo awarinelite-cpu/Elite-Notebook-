@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getNoteColors } from '../constants.js'
 import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
@@ -6,6 +6,16 @@ import ImageEditor from './ImageEditor.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', labels: [], images: [], reminderAt: null }
+
+// An image slot is either a finished string URL, or a placeholder object
+// `{ id, previewUrl, uploading: true }` shown instantly (with a spinner)
+// while the real upload is still in flight.
+function srcOf(slot) {
+  return typeof slot === 'string' ? slot : slot.previewUrl
+}
+function isUploading(slot) {
+  return typeof slot !== 'string'
+}
 
 export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError }) {
   const { theme } = useTheme()
@@ -20,13 +30,20 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [color, setColor] = useState(base.color || 'default')
   const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
   const [images, setImages] = useState(base.images || [])
-  const [uploading, setUploading] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [editingImage, setEditingImage] = useState(null) // index of image being edited
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
   const fileInput = useRef(null)
+  const uploading = images.some(isUploading)
+
+  // Images picked before the modal even opened (e.g. from the FAB) upload
+  // through this same placeholder pipeline, so they behave identically.
+  useEffect(() => {
+    if (base.pendingFiles?.length) uploadFiles(base.pendingFiles)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function buildPatch() {
     return {
@@ -35,14 +52,14 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       checklist,
       color,
       labels: selectedLabels,
-      images,
+      images: images.filter((img) => typeof img === 'string'),
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
     }
   }
 
   function handleClose() {
     const patch = buildPatch()
-    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && patch.images.length === 0
+    const isEmpty = !patch.title && !patch.text && patch.checklist.length === 0 && images.length === 0
 
     if (isNew) {
       if (!isEmpty) onCreate(patch)
@@ -72,26 +89,53 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     setChecklist(checklist.filter((_, i) => i !== idx))
   }
 
-  async function handleFile(e) {
+  // Adds a placeholder for each file immediately (so it's visible with a
+  // spinner right away), then swaps each one in place with its real URL as
+  // the upload finishes — or drops it if the upload fails.
+  async function uploadFiles(files) {
+    const placeholders = files.map((f) => ({
+      id: crypto.randomUUID(),
+      previewUrl: URL.createObjectURL(f),
+      uploading: true,
+    }))
+    setImages((imgs) => [...imgs, ...placeholders])
+
+    const results = await Promise.all(
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+    )
+
+    setImages((imgs) => {
+      let next = imgs
+      for (const { ph, url } of results) {
+        next = url
+          ? next.map((slot) => (typeof slot !== 'string' && slot.id === ph.id ? url : slot))
+          : next.filter((slot) => !(typeof slot !== 'string' && slot.id === ph.id))
+      }
+      return next
+    })
+    results.forEach(({ ph }) => URL.revokeObjectURL(ph.previewUrl))
+    if (results.some((r) => !r.url)) onUploadError?.()
+  }
+
+  function handleFile(e) {
     const files = Array.from(e.target.files || [])
-    if (!files.length) return
-    setUploading(true)
-    const urls = await Promise.all(files.map((f) => onUploadImage(f)))
-    const ok = urls.filter(Boolean)
-    if (ok.length) setImages((imgs) => [...imgs, ...ok])
-    if (ok.length < files.length) onUploadError?.()
-    setUploading(false)
     e.target.value = ''
+    if (!files.length) return
+    uploadFiles(files)
   }
 
   async function handleEditSave(blob) {
-    setUploading(true)
-    const file = new File([blob], `edited-${Date.now()}.jpg`, { type: 'image/jpeg' })
-    const url = await onUploadImage(file)
-    setUploading(false)
+    const idx = editingImage
+    const original = images[idx]
     setEditingImage(null)
-    if (url) setImages((imgs) => imgs.map((src, i) => (i === editingImage ? url : src)))
-    else onUploadError?.()
+    const file = new File([blob], `edited-${Date.now()}.jpg`, { type: 'image/jpeg' })
+    const placeholderId = crypto.randomUUID()
+    setImages((imgs) =>
+      imgs.map((slot, i) => (i === idx ? { id: placeholderId, previewUrl: URL.createObjectURL(file), uploading: true } : slot))
+    )
+    const url = await onUploadImage(file)
+    setImages((imgs) => imgs.map((slot) => (typeof slot !== 'string' && slot.id === placeholderId ? (url || original) : slot)))
+    if (!url) onUploadError?.()
   }
 
   return (
@@ -108,30 +152,47 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
 
         {images.length > 0 && (
           <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
-            {images.map((src, i) => (
-              <div key={i} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
-                <img
-                  src={src}
-                  alt=""
-                  style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, cursor: 'pointer' }}
-                  onClick={() => setLightboxIndex(i)}
-                />
-                <button
-                  className="thumb-remove"
-                  title="Remove image"
-                  onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                >
-                  <IconClose width="12" height="12" />
-                </button>
-                <button
-                  className="thumb-edit"
-                  title="Edit image"
-                  onClick={() => setEditingImage(i)}
-                >
-                  <IconEdit width="12" height="12" />
-                </button>
-              </div>
-            ))}
+            {images.map((slot, i) => {
+              const pending = isUploading(slot)
+              return (
+                <div key={pending ? slot.id : `${slot}-${i}`} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
+                  <img
+                    src={srcOf(slot)}
+                    alt=""
+                    style={{
+                      width: 96,
+                      height: 96,
+                      objectFit: 'cover',
+                      borderRadius: 8,
+                      cursor: pending ? 'default' : 'pointer',
+                      opacity: pending ? 0.6 : 1,
+                    }}
+                    onClick={() => !pending && setLightboxIndex(i)}
+                  />
+                  {pending && (
+                    <div className="thumb-spinner" aria-label="Uploading">
+                      <span className="spinner" />
+                    </div>
+                  )}
+                  <button
+                    className="thumb-remove"
+                    title="Remove image"
+                    onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
+                  >
+                    <IconClose width="12" height="12" />
+                  </button>
+                  {!pending && (
+                    <button
+                      className="thumb-edit"
+                      title="Edit image"
+                      onClick={() => setEditingImage(i)}
+                    >
+                      <IconEdit width="12" height="12" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

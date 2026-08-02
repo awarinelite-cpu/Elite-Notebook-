@@ -1,17 +1,15 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { auth, googleProvider } from '../firebase.js'
 
 const AuthContext = createContext(null)
 
-// Drive access tokens from Firebase's OAuth flow expire after about an hour
-// and Firebase does not refresh them for you, so we keep it in memory only
-// and let the user "reconnect" (a quick, mostly-invisible popup) whenever a
-// Drive API call comes back as unauthorized.
+// This only handles the main app account (Firebase Auth). Google Drive has
+// its own, separate connection — see useDriveAuth.js — so that signing out
+// of Drive never signs the person out of the app, and vice versa.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [driveToken, setDriveToken] = useState(null)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -21,29 +19,16 @@ export function AuthProvider({ children }) {
     return unsub
   }, [])
 
-  async function login() {
-    const result = await signInWithPopup(auth, googleProvider)
-    const credential = GoogleAuthProvider.credentialFromResult(result)
-    if (credential?.accessToken) setDriveToken(credential.accessToken)
-    return result
-  }
-
-  // Same as login, but used to silently refresh the Drive token when it
-  // expires, without disturbing the rest of the app's auth state.
-  async function connectDrive() {
-    const result = await signInWithPopup(auth, googleProvider)
-    const credential = GoogleAuthProvider.credentialFromResult(result)
-    if (credential?.accessToken) setDriveToken(credential.accessToken)
-    return credential?.accessToken || null
+  function login() {
+    return signInWithPopup(auth, googleProvider)
   }
 
   function logout() {
-    setDriveToken(null)
     return signOut(auth)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, driveToken, connectDrive }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

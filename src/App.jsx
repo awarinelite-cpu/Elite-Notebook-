@@ -83,14 +83,12 @@ export default function App() {
     // 'drawing' and 'audio' aren't supported yet — quietly no-op
   }
 
-  async function handlePickImage(files) {
+  function handlePickImage(files) {
+    // Open the note editor right away with the files queued as
+    // `pendingFiles` — the modal shows them instantly with a spinner and
+    // uploads them itself, instead of us blocking here until they finish.
     const list = Array.isArray(files) ? files : [files]
-    const urls = await Promise.all(list.map((f) => uploadImage(f)))
-    const ok = urls.filter(Boolean)
-    if (ok.length < list.length) {
-      setToast("Some images couldn't upload — check Firebase Storage is set up and its rules are published.")
-    }
-    if (ok.length) setDraft((d) => ({ ...(d || {}), images: [...((d && d.images) || []), ...ok] }))
+    setDraft((d) => ({ ...(d || {}), pendingFiles: [...((d && d.pendingFiles) || []), ...list] }))
   }
 
   return (

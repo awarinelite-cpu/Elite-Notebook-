@@ -22,7 +22,7 @@ Keep-style notes today; Google Drive document linking arrives in phase 2.
    ```
    cp .env.example .env
    ```
-   Fill in each `VITE_FIREBASE_*` value.
+   Fill in each `VITE_FIREBASE_*` value, plus `VITE_GOOGLE_CLIENT_ID` (Authentication → Sign-in method → Google → Web SDK configuration → "Web client ID") for the Drive panel.
 
 6. Deploy the security rules:
    ```
