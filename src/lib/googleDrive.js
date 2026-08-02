@@ -8,7 +8,12 @@
 // configuration (Google Cloud Console → APIs & Services → Credentials for
 // the same project also shows it). No new OAuth app needs to be created.
 
-const SCOPE = 'https://www.googleapis.com/auth/drive.readonly openid email profile'
+// drive.readonly alone can't create folders or upload files. drive.file
+// would only let us write into files/folders this app itself created, not
+// into arbitrary existing folders the person browses to — so full `drive`
+// is needed to upload into any folder they navigate to in-app.
+const SCOPE = 'https://www.googleapis.com/auth/drive openid email profile'
+const SCOPE_VERSION = 2 // bump whenever SCOPE changes, to force existing sessions to reconnect
 const STORAGE_KEY = 'elite-notebook:drive-session'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -35,7 +40,10 @@ function loadScript() {
 export function loadDriveSession() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const session = JSON.parse(raw)
+    if (session.scopeVersion !== SCOPE_VERSION) return null
+    return session
   } catch {
     return null
   }
@@ -87,6 +95,7 @@ export function requestDriveToken({ interactive = true, loginHint } = {}) {
               accessToken: resp.access_token,
               expiresAt: Date.now() + (Number(resp.expires_in) || 3300) * 1000,
               email,
+              scopeVersion: SCOPE_VERSION,
             }
             saveDriveSession(session)
             resolve(session)

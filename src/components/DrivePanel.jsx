@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
-import { IconSearch, IconClose } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage } from './Icons.jsx'
 
 const FILES_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
 const FIELDS = 'files(id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size),nextPageToken'
@@ -24,6 +24,41 @@ function formatSize(bytes) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const NEW_FIELDS = 'id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size'
+
+async function createDriveFolder(token, name, parentId) {
+  const res = await fetch(`${FILES_ENDPOINT}?fields=${NEW_FIELDS}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      mimeType: FOLDER_MIME,
+      parents: parentId ? [parentId] : undefined,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error?.message || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+async function uploadDriveFile(token, file, parentId) {
+  const metadata = { name: file.name, parents: parentId ? [parentId] : undefined }
+  const form = new FormData()
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+  form.append('file', file)
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=${NEW_FIELDS}`,
+    { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
+  )
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.error?.message || `HTTP ${res.status}`)
+  }
+  return res.json()
 }
 
 // Google's Docs/Sheets/Slides/file preview iframes render at a fixed
@@ -76,6 +111,11 @@ export default function DrivePanel() {
   const [search, setSearch] = useState('')
   const [previewing, setPreviewing] = useState(null)
   const [folderStack, setFolderStack] = useState([]) // [{ id, name }], in-app folder navigation
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [pendingUploads, setPendingUploads] = useState([]) // [{ id, name }] shown as spinner cards
+  const [actionError, setActionError] = useState(null)
+  const uploadInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
 
@@ -144,6 +184,48 @@ export default function DrivePanel() {
     setFolderStack((stack) => stack.slice(0, index + 1))
   }
 
+  async function submitNewFolder(e) {
+    e.preventDefault()
+    const name = newFolderName.trim()
+    if (!name) return
+    setCreatingFolder(false)
+    setNewFolderName('')
+    setActionError(null)
+    try {
+      const folder = await createDriveFolder(accessToken, name, currentFolder?.id)
+      setFiles((list) => [folder, ...(list || [])])
+    } catch (e2) {
+      setActionError(`Could not create folder: ${e2.message}`)
+    }
+  }
+
+  function handleUploadPick(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!picked.length) return
+    setActionError(null)
+    const placeholders = picked.map((f) => ({ id: crypto.randomUUID(), name: f.name }))
+    setPendingUploads((list) => [...placeholders, ...list])
+
+    let failed = 0
+    Promise.all(
+      picked.map((file, i) =>
+        uploadDriveFile(accessToken, file, currentFolder?.id)
+          .then((uploaded) => {
+            setFiles((list) => [uploaded, ...(list || [])])
+          })
+          .catch(() => {
+            failed++
+          })
+          .finally(() => {
+            setPendingUploads((list) => list.filter((p) => p.id !== placeholders[i].id))
+          })
+      )
+    ).then(() => {
+      if (failed) setActionError(`${failed} file${failed > 1 ? 's' : ''} failed to upload.`)
+    })
+  }
+
   if (!connected) {
     return (
       <div className="drive-connect">
@@ -199,6 +281,42 @@ export default function DrivePanel() {
         </div>
       )}
 
+      {!search && (
+        <div className="drive-action-bar">
+          {!creatingFolder ? (
+            <>
+              <button className="drive-action-btn" onClick={() => setCreatingFolder(true)}>
+                <IconPlus width="16" height="16" /> New folder
+              </button>
+              <button className="drive-action-btn" onClick={() => uploadInput.current?.click()}>
+                <IconImage width="16" height="16" /> Upload here
+              </button>
+              <input ref={uploadInput} type="file" multiple hidden onChange={handleUploadPick} />
+            </>
+          ) : (
+            <form className="drive-new-folder-form" onSubmit={submitNewFolder}>
+              <input
+                type="text"
+                autoFocus
+                placeholder="Folder name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+              />
+              <button className="pill-btn" type="submit">Create</button>
+              <button
+                type="button"
+                className="text-btn"
+                onClick={() => { setCreatingFolder(false); setNewFolderName('') }}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {actionError && <p className="drive-error">{actionError}</p>}
+
       {loadError === 'expired' && (
         <div className="drive-connect">
           <p>Your Drive session expired.</p>
@@ -211,11 +329,20 @@ export default function DrivePanel() {
 
       {files === null && !loadError && <p className="drive-loading">Loading your Drive…</p>}
 
-      {files && files.length === 0 && <p className="drive-loading">No files found.</p>}
+      {files && files.length === 0 && pendingUploads.length === 0 && <p className="drive-loading">No files found.</p>}
 
-      {files && files.length > 0 && (
+      {((files && files.length > 0) || pendingUploads.length > 0) && (
         <div className="note-grid drive-grid">
-          {files.map((f) => (
+          {pendingUploads.map((p) => (
+            <div key={p.id} className="note-card drive-card drive-card-uploading">
+              <div className="drive-card-icon-wrap">
+                <span className="spinner" />
+              </div>
+              <h3>{p.name}</h3>
+              <p className="drive-card-meta">Uploading…</p>
+            </div>
+          ))}
+          {files && files.map((f) => (
             <button key={f.id} className="note-card drive-card" onClick={() => openFile(f)}>
               {f.thumbnailLink ? (
                 <img src={f.thumbnailLink} alt="" loading="lazy" />

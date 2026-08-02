@@ -802,6 +802,53 @@ a {
   margin: 0 2px;
 }
 
+.drive-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.drive-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.drive-new-folder-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drive-new-folder-form input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.drive-card-uploading {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.drive-card-uploading .drive-card-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .drive-loading {
   color: var(--ink-soft);
   font-size: 14px;
@@ -957,13 +1004,20 @@ a {
   pointer-events: none;
 }
 
-.thumb-spinner .spinner {
+.thumb-spinner .spinner,
+.spinner {
   width: 22px;
   height: 22px;
   border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--fab-icon);
+  animation: thumb-spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+.thumb-spinner .spinner {
   border: 3px solid rgba(255, 255, 255, 0.55);
   border-top-color: #fff;
-  animation: thumb-spin 0.7s linear infinite;
 }
 
 @keyframes thumb-spin {
