@@ -1,25 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList } from './Icons.jsx'
+import { listFiles, createFolder, uploadFile, FOLDER_MIME } from '../lib/driveApi.js'
+import { transferItems } from '../lib/driveTransfer.js'
+import DriveFolderIcon from './DriveFolderIcon.jsx'
+import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
+import DriveFolderPicker from './DriveFolderPicker.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo } from './Icons.jsx'
 
-const FILES_ENDPOINT = 'https://www.googleapis.com/drive/v3/files'
-const FIELDS =
-  'files(id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size,folderColorRgb),nextPageToken'
-const FOLDER_MIME = 'application/vnd.google-apps.folder'
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
-
-// Matches Google Drive's own folder glyph so folders read the same way they
-// do in the real Drive app — including the color the person picked there.
-function FolderIcon({ color, size = 40 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M3 6.5C3 5.67 3.67 5 4.5 5h4.4c.34 0 .67.12.93.34l1.6 1.33c.26.22.6.34.94.34H19.5c.83 0 1.5.67 1.5 1.5v9.17c0 .83-.67 1.5-1.5 1.5h-15C3.67 19.17 3 18.5 3 17.67V6.5Z"
-        fill={color || DEFAULT_FOLDER_COLOR}
-      />
-    </svg>
-  )
-}
 
 function formatModified(iso) {
   if (!iso) return ''
@@ -47,41 +35,6 @@ function formatSize(bytes) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const NEW_FIELDS = 'id,name,mimeType,iconLink,thumbnailLink,modifiedTime,webViewLink,size,folderColorRgb'
-
-async function createDriveFolder(token, name, parentId) {
-  const res = await fetch(`${FILES_ENDPOINT}?fields=${NEW_FIELDS}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name,
-      mimeType: FOLDER_MIME,
-      parents: parentId ? [parentId] : undefined,
-    }),
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    throw new Error(body?.error?.message || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
-
-async function uploadDriveFile(token, file, parentId) {
-  const metadata = { name: file.name, parents: parentId ? [parentId] : undefined }
-  const form = new FormData()
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-  form.append('file', file)
-  const res = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=${NEW_FIELDS}`,
-    { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }
-  )
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    throw new Error(body?.error?.message || `HTTP ${res.status}`)
-  }
-  return res.json()
 }
 
 // Google's Docs/Sheets/Slides/file preview iframes render at a fixed
@@ -128,7 +81,12 @@ function ScaledPreviewFrame({ src, title }) {
 }
 
 export default function DrivePanel() {
-  const { email, accessToken, connected, expired, connecting, error, connect, disconnect } = useDriveAuth()
+  const {
+    accounts, active, activeEmail, accessToken, connected, expired, hasAnyAccount,
+    connecting, error, addAccount, reconnect, disconnect, switchAccount, tokenFor,
+  } = useDriveAuth()
+  const email = active?.email || null
+
   const [files, setFiles] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [search, setSearch] = useState('')
@@ -138,45 +96,39 @@ export default function DrivePanel() {
   const [newFolderName, setNewFolderName] = useState('')
   const [pendingUploads, setPendingUploads] = useState([]) // [{ id, name }] shown as spinner cards
   const [actionError, setActionError] = useState(null)
+  const [actionNotice, setActionNotice] = useState(null)
   const [listView, setListView] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(new Map()) // id -> file object
+  const [transferMode, setTransferMode] = useState(null) // 'copy' | 'move' | null
   const uploadInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
 
+  // Switching the active account means we're looking at a completely
+  // different file tree — reset navigation and any in-progress selection.
+  useEffect(() => {
+    setFolderStack([])
+    setSearch('')
+    setSelectMode(false)
+    setSelected(new Map())
+  }, [activeEmail])
+
   async function loadFiles(token, query, parentId) {
     setLoadError(null)
-    const clauses = ['trashed = false']
-    if (query) clauses.push(`name contains '${query.replace(/'/g, "\\'")}'`)
-    else if (parentId) clauses.push(`'${parentId}' in parents`)
-    const params = new URLSearchParams({
-      pageSize: '50',
-      fields: FIELDS,
-      orderBy: 'folder,modifiedTime desc',
-      q: clauses.join(' and '),
-    })
-    const res = await fetch(`${FILES_ENDPOINT}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.status === 401) {
-      setFiles(null)
-      const fresh = await connect(true)
-      if (fresh) return loadFiles(fresh.accessToken, query, parentId)
-      setLoadError('expired')
-      return
-    }
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`
-      try {
-        const body = await res.json()
-        detail = body?.error?.message || detail
-      } catch (e) {
-        // response wasn't JSON — keep the HTTP status as the detail
+    try {
+      const data = await listFiles(token, { query, parentId })
+      setFiles(data.files || [])
+    } catch (e) {
+      if (e.status === 401) {
+        setFiles(null)
+        const fresh = await reconnect(email, true)
+        if (fresh) return loadFiles(fresh.accessToken, query, parentId)
+        setLoadError('expired')
+        return
       }
-      setLoadError(`Could not load your Drive files: ${detail}`)
-      return
+      setLoadError(`Could not load your Drive files: ${e.message}`)
     }
-    const data = await res.json()
-    setFiles(data.files || [])
   }
 
   useEffect(() => {
@@ -192,7 +144,15 @@ export default function DrivePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
+  function refreshCurrentFolder() {
+    if (accessToken) loadFiles(accessToken, search, currentFolder?.id)
+  }
+
   function openFile(f) {
+    if (selectMode) {
+      toggleSelect(f)
+      return
+    }
     if (f.mimeType === FOLDER_MIME) {
       setSearch('')
       setFolderStack((stack) => [...stack, { id: f.id, name: f.name }])
@@ -208,6 +168,20 @@ export default function DrivePanel() {
     setFolderStack((stack) => stack.slice(0, index + 1))
   }
 
+  function toggleSelect(f) {
+    setSelected((prev) => {
+      const next = new Map(prev)
+      if (next.has(f.id)) next.delete(f.id)
+      else next.set(f.id, f)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectMode(false)
+    setSelected(new Map())
+  }
+
   async function submitNewFolder(e) {
     e.preventDefault()
     const name = newFolderName.trim()
@@ -216,7 +190,7 @@ export default function DrivePanel() {
     setNewFolderName('')
     setActionError(null)
     try {
-      const folder = await createDriveFolder(accessToken, name, currentFolder?.id)
+      const folder = await createFolder(accessToken, name, currentFolder?.id)
       setFiles((list) => [folder, ...(list || [])])
     } catch (e2) {
       setActionError(`Could not create folder: ${e2.message}`)
@@ -234,7 +208,7 @@ export default function DrivePanel() {
     let failed = 0
     Promise.all(
       picked.map((file, i) =>
-        uploadDriveFile(accessToken, file, currentFolder?.id)
+        uploadFile(accessToken, file, currentFolder?.id)
           .then((uploaded) => {
             setFiles((list) => [uploaded, ...(list || [])])
           })
@@ -250,12 +224,42 @@ export default function DrivePanel() {
     })
   }
 
-  if (!connected) {
+  async function handleTransferConfirm({ email: destEmail, folderId, folderName }) {
+    const mode = transferMode
+    const items = Array.from(selected.values())
+    const destToken = tokenFor(destEmail)
+    const sameAccount = destEmail === email
+
+    setTransferMode(null)
+    setActionError(null)
+    setActionNotice(`${mode === 'copy' ? 'Copying' : 'Moving'} ${items.length} item${items.length > 1 ? 's' : ''} to ${folderName}…`)
+
+    const result = await transferItems({
+      items,
+      mode,
+      sourceToken: accessToken,
+      destToken,
+      destParentId: folderId,
+      sourceParentId: currentFolder?.id,
+      sameAccount,
+    })
+
+    clearSelection()
+    refreshCurrentFolder()
+
+    const bits = [`${result.succeeded} of ${result.total} ${mode === 'copy' ? 'copied' : 'moved'} to ${folderName}`]
+    if (result.skipped.length) bits.push(`${result.skipped.length} skipped (unsupported file type: ${result.skipped.join(', ')})`)
+    if (result.failed.length) bits.push(`${result.failed.length} failed`)
+    setActionNotice(bits.join(' — '))
+    setTimeout(() => setActionNotice(null), 6000)
+  }
+
+  if (!hasAnyAccount) {
     return (
       <div className="drive-connect">
-        {expired ? <p>Your Drive session expired.</p> : <p>Link your Google Drive to view your files here.</p>}
-        <button className="drive-connect-btn" onClick={() => connect(true)} disabled={connecting}>
-          {connecting ? 'Connecting…' : expired ? 'Reconnect Google Drive' : 'Connect Google Drive'}
+        <p>Link your Google Drive to view your files here.</p>
+        <button className="drive-connect-btn" onClick={() => addAccount()} disabled={connecting}>
+          {connecting ? 'Connecting…' : 'Connect Google Drive'}
         </button>
         {error === 'missing-client-id' && (
           <p className="drive-error">
@@ -281,148 +285,201 @@ export default function DrivePanel() {
           />
         </div>
         <div className="drive-account">
+          <button
+            className={`icon-toggle-btn ${selectMode ? 'icon-toggle-btn-active' : ''}`}
+            onClick={() => (selectMode ? clearSelection() : setSelectMode(true))}
+            title={selectMode ? 'Cancel selection' : 'Select files'}
+          >
+            <IconCheck width="17" height="17" />
+          </button>
           <button className="icon-toggle-btn" onClick={() => setListView((v) => !v)} title={listView ? 'Grid view' : 'List view'}>
             {listView ? <IconGrid /> : <IconList />}
           </button>
-          <span className="drive-account-email" title={email || ''}>{email}</span>
-          <button className="text-btn" onClick={disconnect}>Disconnect</button>
+          <DriveAccountSwitcher
+            accounts={accounts}
+            activeEmail={activeEmail}
+            onSwitch={switchAccount}
+            onAddAccount={addAccount}
+            onDisconnect={disconnect}
+            connecting={connecting}
+          />
         </div>
       </div>
 
-      {!search && (
-        <div className="drive-breadcrumbs">
-          <button className={`drive-crumb ${!currentFolder ? 'active' : ''}`} onClick={() => goToCrumb(-1)}>
-            My Drive
+      {selected.size > 0 && (
+        <div className="drive-selection-bar">
+          <span>{selected.size} selected</span>
+          <button className="pill-btn" onClick={() => setTransferMode('copy')}>
+            <IconCopyTo width="15" height="15" /> Copy to…
           </button>
-          {folderStack.map((f, i) => (
-            <span key={f.id}>
-              <span className="drive-crumb-sep">/</span>
-              <button
-                className={`drive-crumb ${i === folderStack.length - 1 ? 'active' : ''}`}
-                onClick={() => goToCrumb(i)}
-              >
-                {f.name}
-              </button>
-            </span>
-          ))}
+          <button className="pill-btn" onClick={() => setTransferMode('move')}>
+            <IconMoveTo width="15" height="15" /> Move to…
+          </button>
+          <button className="text-btn" style={{ marginLeft: 'auto' }} onClick={clearSelection}>Cancel</button>
         </div>
       )}
 
-      {!search && (
-        <div className="drive-action-bar">
-          {!creatingFolder ? (
-            <>
-              <button className="drive-action-btn" onClick={() => setCreatingFolder(true)}>
-                <IconPlus width="16" height="16" /> New folder
-              </button>
-              <button className="drive-action-btn" onClick={() => uploadInput.current?.click()}>
-                <IconImage width="16" height="16" /> Upload here
-              </button>
-              <input ref={uploadInput} type="file" multiple hidden onChange={handleUploadPick} />
-            </>
-          ) : (
-            <form className="drive-new-folder-form" onSubmit={submitNewFolder}>
-              <input
-                type="text"
-                autoFocus
-                placeholder="Folder name"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-              />
-              <button className="pill-btn" type="submit">Create</button>
-              <button
-                type="button"
-                className="text-btn"
-                onClick={() => { setCreatingFolder(false); setNewFolderName('') }}
-              >
-                Cancel
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {actionError && <p className="drive-error">{actionError}</p>}
-
-      {loadError === 'expired' && (
+      {!connected && (
         <div className="drive-connect">
-          <p>Your Drive session expired.</p>
-          <button className="drive-connect-btn" onClick={() => connect(true)} disabled={connecting}>
-            {connecting ? 'Connecting…' : 'Reconnect Google Drive'}
-          </button>
+          <p>{expired ? `${email}'s Drive session expired.` : `Connecting to ${email}…`}</p>
+          {expired && (
+            <button className="drive-connect-btn" onClick={() => reconnect(email, true)} disabled={connecting}>
+              {connecting ? 'Connecting…' : 'Reconnect'}
+            </button>
+          )}
         </div>
       )}
-      {loadError && loadError !== 'expired' && <p className="drive-error">{loadError}</p>}
 
-      {files === null && !loadError && <p className="drive-loading">Loading your Drive…</p>}
-
-      {files && files.length === 0 && pendingUploads.length === 0 && <p className="drive-loading">No files found.</p>}
-
-      {((files && files.length > 0) || pendingUploads.length > 0) && (
-        <div className={listView ? 'drive-list' : 'note-grid drive-grid'}>
-          {pendingUploads.map((p) =>
-            listView ? (
-              <div key={p.id} className="drive-row drive-row-uploading">
-                <span className="spinner" />
-                <div className="drive-row-text">
-                  <span className="drive-row-name">{p.name}</span>
-                  <span className="drive-row-meta">Uploading…</span>
-                </div>
-              </div>
-            ) : (
-              <div key={p.id} className="note-card drive-card drive-card-uploading">
-                <div className="drive-card-icon-wrap">
-                  <span className="spinner" />
-                </div>
-                <h3>{p.name}</h3>
-                <p className="drive-card-meta">Uploading…</p>
-              </div>
-            )
-          )}
-          {files &&
-            files.map((f) => {
-              const isFolder = f.mimeType === FOLDER_MIME
-              const folderColor = f.folderColorRgb || DEFAULT_FOLDER_COLOR
-
-              if (listView) {
-                return (
-                  <button key={f.id} className="drive-row" onClick={() => openFile(f)}>
-                    {isFolder ? (
-                      <FolderIcon color={folderColor} size={28} />
-                    ) : (
-                      <img className="drive-row-icon" src={f.iconLink} alt="" loading="lazy" />
-                    )}
-                    <div className="drive-row-text">
-                      <span className="drive-row-name">{f.name}</span>
-                      <span className="drive-row-meta">
-                        {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
-                      </span>
-                    </div>
+      {connected && (
+        <>
+          {!search && (
+            <div className="drive-breadcrumbs">
+              <button className={`drive-crumb ${!currentFolder ? 'active' : ''}`} onClick={() => goToCrumb(-1)}>
+                My Drive
+              </button>
+              {folderStack.map((f, i) => (
+                <span key={f.id}>
+                  <span className="drive-crumb-sep">/</span>
+                  <button
+                    className={`drive-crumb ${i === folderStack.length - 1 ? 'active' : ''}`}
+                    onClick={() => goToCrumb(i)}
+                  >
+                    {f.name}
                   </button>
-                )
-              }
+                </span>
+              ))}
+            </div>
+          )}
 
-              return (
-                <button key={f.id} className="note-card drive-card" onClick={() => openFile(f)}>
-                  {isFolder ? (
-                    <div className="drive-card-icon-wrap">
-                      <FolderIcon color={folderColor} size={44} />
+          {!search && (
+            <div className="drive-action-bar">
+              {!creatingFolder ? (
+                <>
+                  <button className="drive-action-btn" onClick={() => setCreatingFolder(true)}>
+                    <IconPlus width="16" height="16" /> New folder
+                  </button>
+                  <button className="drive-action-btn" onClick={() => uploadInput.current?.click()}>
+                    <IconImage width="16" height="16" /> Upload here
+                  </button>
+                  <input ref={uploadInput} type="file" multiple hidden onChange={handleUploadPick} />
+                </>
+              ) : (
+                <form className="drive-new-folder-form" onSubmit={submitNewFolder}>
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Folder name"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                  />
+                  <button className="pill-btn" type="submit">Create</button>
+                  <button
+                    type="button"
+                    className="text-btn"
+                    onClick={() => { setCreatingFolder(false); setNewFolderName('') }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {actionNotice && <p className="drive-loading">{actionNotice}</p>}
+          {actionError && <p className="drive-error">{actionError}</p>}
+
+          {loadError === 'expired' && (
+            <div className="drive-connect">
+              <p>Your Drive session expired.</p>
+              <button className="drive-connect-btn" onClick={() => reconnect(email, true)} disabled={connecting}>
+                {connecting ? 'Connecting…' : 'Reconnect Google Drive'}
+              </button>
+            </div>
+          )}
+          {loadError && loadError !== 'expired' && <p className="drive-error">{loadError}</p>}
+
+          {files === null && !loadError && <p className="drive-loading">Loading your Drive…</p>}
+
+          {files && files.length === 0 && pendingUploads.length === 0 && <p className="drive-loading">No files found.</p>}
+
+          {((files && files.length > 0) || pendingUploads.length > 0) && (
+            <div className={listView ? 'drive-list' : 'note-grid drive-grid'}>
+              {pendingUploads.map((p) =>
+                listView ? (
+                  <div key={p.id} className="drive-row drive-row-uploading">
+                    <span className="spinner" />
+                    <div className="drive-row-text">
+                      <span className="drive-row-name">{p.name}</span>
+                      <span className="drive-row-meta">Uploading…</span>
                     </div>
-                  ) : f.thumbnailLink ? (
-                    <img src={f.thumbnailLink} alt="" loading="lazy" />
-                  ) : (
+                  </div>
+                ) : (
+                  <div key={p.id} className="note-card drive-card drive-card-uploading">
                     <div className="drive-card-icon-wrap">
-                      <img className="drive-card-icon" src={f.iconLink} alt="" loading="lazy" />
+                      <span className="spinner" />
                     </div>
-                  )}
-                  <h3>{f.name}</h3>
-                  <p className="drive-card-meta">
-                    {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
-                  </p>
-                </button>
-              )
-            })}
-        </div>
+                    <h3>{p.name}</h3>
+                    <p className="drive-card-meta">Uploading…</p>
+                  </div>
+                )
+              )}
+              {files &&
+                files.map((f) => {
+                  const isFolder = f.mimeType === FOLDER_MIME
+                  const folderColor = f.folderColorRgb || DEFAULT_FOLDER_COLOR
+                  const isSelected = selected.has(f.id)
+
+                  if (listView) {
+                    return (
+                      <button key={f.id} className={`drive-row ${isSelected ? 'drive-row-selected' : ''}`} onClick={() => openFile(f)}>
+                        {selectMode && (
+                          <span className={`drive-select-check ${isSelected ? 'checked' : ''}`}>
+                            {isSelected && <IconCheck width="12" height="12" />}
+                          </span>
+                        )}
+                        {isFolder ? (
+                          <DriveFolderIcon color={folderColor} size={28} />
+                        ) : (
+                          <img className="drive-row-icon" src={f.iconLink} alt="" loading="lazy" />
+                        )}
+                        <div className="drive-row-text">
+                          <span className="drive-row-name">{f.name}</span>
+                          <span className="drive-row-meta">
+                            {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  }
+
+                  return (
+                    <button key={f.id} className={`note-card drive-card ${isSelected ? 'drive-card-selected' : ''}`} onClick={() => openFile(f)}>
+                      {selectMode && (
+                        <span className={`drive-select-check drive-select-check-card ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <IconCheck width="12" height="12" />}
+                        </span>
+                      )}
+                      {isFolder ? (
+                        <div className="drive-card-icon-wrap">
+                          <DriveFolderIcon color={folderColor} size={44} />
+                        </div>
+                      ) : f.thumbnailLink ? (
+                        <img src={f.thumbnailLink} alt="" loading="lazy" />
+                      ) : (
+                        <div className="drive-card-icon-wrap">
+                          <img className="drive-card-icon" src={f.iconLink} alt="" loading="lazy" />
+                        </div>
+                      )}
+                      <h3>{f.name}</h3>
+                      <p className="drive-card-meta">
+                        {isFolder ? `Modified ${formatModified(f.modifiedTime)}` : formatSize(f.size)}
+                      </p>
+                    </button>
+                  )
+                })}
+            </div>
+          )}
+        </>
       )}
 
       {previewing && (
@@ -435,6 +492,18 @@ export default function DrivePanel() {
           </div>
           <ScaledPreviewFrame src={previewing.url} title={previewing.name} />
         </div>
+      )}
+
+      {transferMode && (
+        <DriveFolderPicker
+          accounts={accounts}
+          initialEmail={email}
+          tokenFor={tokenFor}
+          reconnect={reconnect}
+          actionLabel={transferMode === 'copy' ? 'Copy' : 'Move'}
+          onCancel={() => setTransferMode(null)}
+          onConfirm={handleTransferConfirm}
+        />
       )}
     </div>
   )

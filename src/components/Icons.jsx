@@ -108,3 +108,18 @@ export function IconDrive(p) { return (
 export function IconSignOut(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5M21 12H9" /></svg>
 )}
+export function IconChevronDown(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="m6 9 6 6 6-6" /></svg>
+)}
+export function IconCheck(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="m5 12 5 5L20 7" /></svg>
+)}
+export function IconCopyTo(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></svg>
+)}
+export function IconMoveTo(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M3 7a1 1 0 0 1 1-1h4.4a1 1 0 0 1 .8.4l1.2 1.6a1 1 0 0 0 .8.4H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" /><path d="M12 12v5M9.5 14.5 12 12l2.5 2.5" /></svg>
+)}
+export function IconUserPlus(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 19.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" /><path d="M19 8v6M16 11h6" /></svg>
+)}

@@ -7,6 +7,11 @@
 // Firebase under Authentication → Sign-in method → Google → Web SDK
 // configuration (Google Cloud Console → APIs & Services → Credentials for
 // the same project also shows it). No new OAuth app needs to be created.
+//
+// Multiple Google accounts can be linked at once — each keeps its own
+// access token, keyed by email. One of them is "active" (the one whose
+// files are shown), but all of them stay connected so copy/move can pull
+// from one and push to another.
 
 // drive.readonly alone can't create folders or upload files. drive.file
 // would only let us write into files/folders this app itself created, not
@@ -14,7 +19,9 @@
 // is needed to upload into any folder they navigate to in-app.
 const SCOPE = 'https://www.googleapis.com/auth/drive openid email profile'
 const SCOPE_VERSION = 2 // bump whenever SCOPE changes, to force existing sessions to reconnect
-const STORAGE_KEY = 'elite-notebook:drive-session'
+const ACCOUNTS_KEY = 'elite-notebook:drive-accounts'
+const ACTIVE_KEY = 'elite-notebook:drive-active-account'
+const LEGACY_SINGLE_KEY = 'elite-notebook:drive-session' // pre-multi-account format
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 let scriptPromise = null
@@ -37,24 +44,43 @@ function loadScript() {
   return scriptPromise
 }
 
-export function loadDriveSession() {
+// Accounts are keyed by email (a Google account's email is a stable,
+// natural id — and it means adding the same account twice just refreshes
+// its token instead of creating a duplicate entry).
+export function loadDriveAccounts() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const session = JSON.parse(raw)
-    if (session.scopeVersion !== SCOPE_VERSION) return null
-    return session
+    const raw = localStorage.getItem(ACCOUNTS_KEY)
+    if (raw) {
+      const accounts = JSON.parse(raw)
+      return accounts.filter((a) => a.scopeVersion === SCOPE_VERSION)
+    }
+    // Migrate a pre-multi-account session, if one exists.
+    const legacyRaw = localStorage.getItem(LEGACY_SINGLE_KEY)
+    if (legacyRaw) {
+      const legacy = JSON.parse(legacyRaw)
+      localStorage.removeItem(LEGACY_SINGLE_KEY)
+      if (legacy.scopeVersion === SCOPE_VERSION && legacy.email) {
+        saveDriveAccounts([legacy])
+        return [legacy]
+      }
+    }
+    return []
   } catch {
-    return null
+    return []
   }
 }
 
-export function saveDriveSession(session) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+export function saveDriveAccounts(accounts) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
 }
 
-export function clearDriveSession() {
-  localStorage.removeItem(STORAGE_KEY)
+export function loadActiveAccountEmail() {
+  return localStorage.getItem(ACTIVE_KEY) || null
+}
+
+export function saveActiveAccountEmail(email) {
+  if (email) localStorage.setItem(ACTIVE_KEY, email)
+  else localStorage.removeItem(ACTIVE_KEY)
 }
 
 async function fetchEmail(accessToken) {
@@ -64,7 +90,7 @@ async function fetchEmail(accessToken) {
     })
     if (!res.ok) return null
     const data = await res.json()
-    return data.email || null
+    return data
   } catch {
     return null
   }
@@ -74,7 +100,10 @@ async function fetchEmail(accessToken) {
 // interactive=false tries a silent, no-popup refresh using the browser's
 // existing Google session — this is what lets Drive "stay connected" after
 // closing and reopening the app, without asking the person to sign in again.
-export function requestDriveToken({ interactive = true, loginHint } = {}) {
+// selectAccount=true forces Google's account chooser even if the browser
+// already has a Google session — this is how "add another account" lets
+// someone pick a *different* account than the one already linked.
+export function requestDriveToken({ interactive = true, loginHint, selectAccount = false } = {}) {
   return loadScript().then(
     () =>
       new Promise((resolve, reject) => {
@@ -90,20 +119,21 @@ export function requestDriveToken({ interactive = true, loginHint } = {}) {
               reject(new Error(resp.error))
               return
             }
-            const email = await fetchEmail(resp.access_token)
+            const profile = await fetchEmail(resp.access_token)
             const session = {
               accessToken: resp.access_token,
               expiresAt: Date.now() + (Number(resp.expires_in) || 3300) * 1000,
-              email,
+              email: profile?.email || loginHint || null,
+              name: profile?.name || null,
+              picture: profile?.picture || null,
               scopeVersion: SCOPE_VERSION,
             }
-            saveDriveSession(session)
             resolve(session)
           },
           error_callback: (err) => reject(new Error(err?.type || 'popup_failed')),
         })
         client.requestAccessToken({
-          prompt: interactive ? 'consent' : '',
+          prompt: selectAccount ? 'select_account consent' : interactive ? 'consent' : '',
           hint: loginHint || undefined,
         })
       })
