@@ -915,7 +915,6 @@ a {
 }
 
 .note-editor-textarea {
-  flex: 1;
   min-height: 160px;
 }
 
