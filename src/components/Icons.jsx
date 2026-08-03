@@ -123,3 +123,6 @@ export function IconMoveTo(p) { return (
 export function IconUserPlus(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 19.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" /><path d="M19 8v6M16 11h6" /></svg>
 )}
+export function IconLock(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+)}

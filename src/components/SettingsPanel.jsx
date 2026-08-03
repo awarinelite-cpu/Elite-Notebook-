@@ -1,10 +1,26 @@
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
-import { IconSignOut, IconMoon, IconSun } from './Icons.jsx'
+import { IconSignOut, IconMoon, IconSun, IconLock } from './Icons.jsx'
+import { PinModal } from './SecurityLock.jsx'
 
-export default function SettingsPanel() {
+const rowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  width: '100%',
+  padding: '12px 16px',
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  fontSize: 14,
+  marginBottom: 10,
+}
+
+export default function SettingsPanel({ security }) {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const [pinModal, setPinModal] = useState(null) // 'setup' | 'change' | 'remove' | null
 
   return (
     <div style={{ maxWidth: 420 }}>
@@ -52,6 +68,32 @@ export default function SettingsPanel() {
         {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
       </button>
 
+      {security && !security.loading && (
+        <>
+          {!security.hasPin ? (
+            <button style={rowStyle} onClick={() => setPinModal('setup')}>
+              <IconLock />
+              Set up PIN lock
+            </button>
+          ) : (
+            <>
+              <button style={rowStyle} onClick={() => setPinModal('change')}>
+                <IconLock />
+                Change PIN
+              </button>
+              <button style={rowStyle} onClick={() => setPinModal('remove')}>
+                <IconLock />
+                Turn off PIN lock
+              </button>
+              <button style={rowStyle} onClick={security.lock}>
+                <IconLock />
+                Lock now
+              </button>
+            </>
+          )}
+        </>
+      )}
+
       <button
         onClick={logout}
         style={{
@@ -69,6 +111,10 @@ export default function SettingsPanel() {
         <IconSignOut />
         Sign out
       </button>
+
+      {pinModal && security && (
+        <PinModal mode={pinModal} security={security} onClose={() => setPinModal(null)} />
+      )}
     </div>
   )
 }

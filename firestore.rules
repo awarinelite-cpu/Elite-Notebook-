@@ -11,5 +11,11 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
     }
+
+    // Stores only a SHA-256 hash of the app-lock PIN, never the PIN itself.
+    // Doc ID is the user's uid, so only that user can ever read or write it.
+    match /userSecurity/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './context/AuthContext.jsx'
 import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
+import { useSecurity } from './hooks/useSecurity.js'
 import Login from './components/Login.jsx'
+import SecurityLock from './components/SecurityLock.jsx'
 import Drawer from './components/Drawer.jsx'
 import TopBar from './components/TopBar.jsx'
 import NoteGrid from './components/NoteGrid.jsx'
@@ -23,6 +25,7 @@ export default function App() {
   const { user, loading } = useAuth()
   const { notes, error, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
   const { labels, createLabel, deleteLabel } = useLabels()
+  const security = useSecurity()
 
   const [view, setView] = useState('notes')
   const [search, setSearch] = useState('')
@@ -89,6 +92,8 @@ export default function App() {
 
   if (loading) return null
   if (!user) return <Login />
+  if (security.loading) return null
+  if (!security.unlocked) return <SecurityLock security={security} />
 
   function togglePin(note) {
     updateNote(note.id, { pinned: !note.pinned })
@@ -156,7 +161,7 @@ export default function App() {
           </div>
         )}
         {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
-        {view === 'settings' && <SettingsPanel />}
+        {view === 'settings' && <SettingsPanel security={security} />}
         {view === 'help' && <HelpPanel />}
         {view === 'drive' && <DrivePanel />}
         {!PANEL_VIEWS.includes(view) && (
