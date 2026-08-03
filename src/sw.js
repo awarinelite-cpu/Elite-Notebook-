@@ -3,6 +3,7 @@ import { clientsClaim } from 'workbox-core'
 import { registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { putPendingShare } from './shareTargetDb.js'
 
 self.skipWaiting()
@@ -21,6 +22,23 @@ registerRoute(
   new CacheFirst({
     cacheName: 'google-fonts-webfonts',
     plugins: [new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 })],
+  })
+)
+
+registerRoute(
+  ({ url }) => url.origin === 'https://firebasestorage.googleapis.com',
+  new CacheFirst({
+    cacheName: 'note-attachments',
+    plugins: [
+      // <img>/<audio> requests to a cross-origin URL are made in 'no-cors'
+      // mode, so the response comes back opaque (status 0) — accept those
+      // alongside normal 200s, or workbox would refuse to cache them at all.
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      // Every upload gets a unique, never-reused storage path (see
+      // uploadImage in useNotes.js), so a cached copy is never stale —
+      // this just bounds how much disk space old attachments can use.
+      new ExpirationPlugin({ maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 180, purgeOnQuotaError: true }),
+    ],
   })
 )
 
