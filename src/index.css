@@ -863,10 +863,27 @@ a {
   width: 100%;
   max-width: 560px;
   max-height: 88vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 20px 24px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.28);
   border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+}
+
+.note-editor-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-editor-textarea {
+  flex: 1;
+  min-height: 160px;
 }
 
 @media (max-width: 640px) {
@@ -883,6 +900,9 @@ a {
     border: none;
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+  .note-editor-textarea {
+    min-height: 40vh;
   }
 }
 
@@ -939,8 +959,9 @@ a {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 0;
   padding-top: 10px;
+  flex-shrink: 0;
   border-top: 1px solid var(--border);
 }
 

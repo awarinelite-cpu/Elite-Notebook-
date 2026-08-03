@@ -252,6 +252,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         style={{ background: background !== 'none' ? NOTE_BACKGROUNDS[background] : NOTE_COLORS[color] }}
         onClick={(e) => e.stopPropagation()}
       >
+      <div className="note-editor-scroll">
         <div className="note-editor-topbar">
           <button className="icon-btn" onClick={handleClose} title="Back">
             <IconBack width="20" height="20" />
@@ -392,8 +393,8 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
             placeholder="Take a note..."
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={4}
-            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 14, marginTop: 10, resize: 'vertical', fontFamily: 'inherit' }}
+            className="note-editor-textarea"
+            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 10, resize: 'none', fontFamily: 'inherit' }}
           />
         ) : (
           <div style={{ marginTop: 10 }}>
@@ -479,6 +480,8 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
             </div>
           </div>
         )}
+
+      </div>
 
         <div className="composer-row" style={{ position: 'relative' }}>
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>

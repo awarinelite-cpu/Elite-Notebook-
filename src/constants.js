@@ -56,6 +56,20 @@ export const NOTE_BACKGROUNDS = {
             radial-gradient(circle at 85% 75%, rgba(255,255,255,0.35) 0 8px, transparent 9px),
             radial-gradient(circle at 15% 85%, rgba(255,255,255,0.45) 0 9px, transparent 10px),
             linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)`,
+  bloom: `radial-gradient(circle at 32% 22%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.15) 42%, transparent 60%),
+          linear-gradient(160deg, #F5F3EA 0%, #D9D4C2 35%, #6B6F5E 70%, #34362C 100%)`,
+  meadow: 'linear-gradient(150deg, #E4F5C0 0%, #9BCB6C 40%, #4F8A4B 75%, #2C5530 100%)',
+  seaglass: 'linear-gradient(160deg, #D3F1F5 0%, #7FCFDB 40%, #2E93A6 70%, #0C5866 100%)',
+  horizon: 'linear-gradient(180deg, #FFE1A8 0%, #FF9F76 28%, #6FB8D9 62%, #1C4E6E 85%, #0D2A3D 100%)',
+  starfield: `radial-gradient(circle at 18% 22%, rgba(255,255,255,0.95) 0 1.4px, transparent 1.5px),
+              radial-gradient(circle at 62% 12%, rgba(255,255,255,0.8) 0 1px, transparent 1.1px),
+              radial-gradient(circle at 80% 52%, rgba(255,255,255,0.7) 0 1.2px, transparent 1.3px),
+              radial-gradient(circle at 35% 68%, rgba(255,255,255,0.85) 0 1.3px, transparent 1.4px),
+              radial-gradient(circle at 50% 38%, rgba(255,255,255,0.6) 0 1px, transparent 1.1px),
+              radial-gradient(circle at 10% 82%, rgba(255,255,255,0.75) 0 1.1px, transparent 1.2px),
+              radial-gradient(circle at 90% 85%, rgba(255,255,255,0.55) 0 1px, transparent 1.1px),
+              linear-gradient(170deg, #040914 0%, #0B1C3D 45%, #123E5E 100%)`,
+  savanna: 'linear-gradient(160deg, #FDEBA8 0%, #F2A65A 42%, #B5651D 75%, #4E3524 100%)',
 }
 
 export const NOTE_BACKGROUND_LABELS = {
@@ -69,4 +83,10 @@ export const NOTE_BACKGROUND_LABELS = {
   dusk: 'Dusk',
   night: 'Night sky',
   bubbles: 'Bubbles',
+  bloom: 'Bloom',
+  meadow: 'Meadow',
+  seaglass: 'Sea glass',
+  horizon: 'Horizon',
+  starfield: 'Starfield',
+  savanna: 'Savanna',
 }
