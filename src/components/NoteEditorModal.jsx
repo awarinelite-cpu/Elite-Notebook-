@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
@@ -52,6 +52,10 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [showReminder, setShowReminder] = useState(false)
   const [showColors, setShowColors] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [createdId, setCreatedId] = useState(null)
+  const currentId = note?.id || createdId
+  const skipFirstAutosave = useRef(true)
+  const creatingRef = useRef(false)
   const fileInput = useRef(null)
   const docInput = useRef(null)
   const textEditorRef = useRef(null)
@@ -96,18 +100,49 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     }
   }
 
-  function handleClose() {
-    const patch = buildPatch()
-    const isEmpty =
+  function isPatchEmpty(patch) {
+    return (
       !patch.title && !patch.text && patch.checklist.length === 0 &&
       images.length === 0 && audioClips.length === 0 && attachments.length === 0
+    )
+  }
 
-    if (isNew) {
-      if (!isEmpty) onCreate(patch)
-    } else if (!isEmpty) {
-      onSave(note.id, patch)
-    } else {
-      onDeleteForever(note.id)
+  // Autosave: any change to the note's content persists a few hundred ms
+  // after the user stops typing, so leaving the editor (backdrop click, back
+  // button, switching apps) never loses an edit. A brand-new note only gets
+  // created once it actually has content; every autosave after that updates
+  // the same document via `currentId` instead of creating duplicates.
+  useEffect(() => {
+    if (skipFirstAutosave.current) {
+      skipFirstAutosave.current = false
+      return
+    }
+    const patch = buildPatch()
+    if (isPatchEmpty(patch)) return
+
+    const t = setTimeout(async () => {
+      if (currentId) {
+        onSave(currentId, patch)
+      } else if (isNew && !creatingRef.current) {
+        creatingRef.current = true
+        const id = await onCreate(patch)
+        creatingRef.current = false
+        if (id) setCreatedId(id)
+      }
+    }, 600)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, text, checklist, color, background, selectedLabels, images, audioClips, attachments, reminderAt, pinned, archived])
+
+  function handleClose() {
+    const patch = buildPatch()
+    const isEmpty = isPatchEmpty(patch)
+
+    if (currentId) {
+      if (isEmpty) onDeleteForever(currentId)
+      else onSave(currentId, patch)
+    } else if (!isEmpty && !creatingRef.current) {
+      onCreate(patch)
     }
     onClose()
   }
@@ -156,6 +191,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
 
   function handleTextInput(e) {
     setText(e.currentTarget.innerHTML)
+  }
+
+  function undoRedo(command) {
+    textEditorRef.current?.focus()
+    document.execCommand(command, false, null)
+    setText(textEditorRef.current?.innerHTML || '')
+    refreshActiveFormats()
   }
 
   // Adds a placeholder for each file immediately (so it's visible with a
@@ -323,6 +365,23 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
 
         {!isChecklist && (
           <div className="format-toolbar" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="icon-btn"
+              onMouseDown={(e) => { e.preventDefault(); undoRedo('undo') }}
+              title="Undo"
+            >
+              <IconUndo width="18" height="18" />
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              onMouseDown={(e) => { e.preventDefault(); undoRedo('redo') }}
+              title="Redo"
+            >
+              <IconRedo width="18" height="18" />
+            </button>
+            <span className="format-toolbar-divider" />
             <button
               type="button"
               className={`icon-btn ${activeFormats.bold ? 'active' : ''}`}

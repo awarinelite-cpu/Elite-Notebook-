@@ -56,9 +56,9 @@ export function useNotes() {
   }, [user])
 
   async function createNote(data) {
-    if (!user) return
+    if (!user) return null
     try {
-      await addDoc(collection(db, 'notes'), {
+      const docRef = await addDoc(collection(db, 'notes'), {
         uid: user.uid,
         title: data.title || '',
         text: data.text || '',
@@ -76,9 +76,11 @@ export function useNotes() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      return docRef.id
     } catch (err) {
       console.error('createNote failed:', err)
       setError(err.message)
+      return null
     }
   }
 

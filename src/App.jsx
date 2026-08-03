@@ -235,6 +235,7 @@ export default function App() {
           labels={labels}
           onClose={() => setDraft(null)}
           onCreate={createNote}
+          onSave={updateNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
           onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}

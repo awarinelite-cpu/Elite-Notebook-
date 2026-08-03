@@ -72,6 +72,9 @@ export function IconPause(p) { return (
 export function IconUndo(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M9 7 4 12l5 5" /><path d="M4 12h10a6 6 0 0 1 0 12h-1" /></svg>
 )}
+export function IconRedo(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="m15 7 5 5-5 5" /><path d="M20 12H10a6 6 0 0 0 0 12h1" /></svg>
+)}
 export function IconEraser(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M18 13 9.5 21.5H5L2.5 19l10-10Z" /><path d="m13 6 5 5" /><path d="M9 21.5h11" /></svg>
 )}
