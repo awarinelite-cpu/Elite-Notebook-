@@ -135,3 +135,18 @@ export function IconLock(p) { return (
 export function IconDownload(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 19h16" /></svg>
 )}
+export function IconBold(p) { return (
+  <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M7 4h6a3.5 3.5 0 0 1 0 7H7z" /><path d="M7 11h7a3.5 3.5 0 0 1 0 7H7z" /></svg>
+)}
+export function IconItalic(p) { return (
+  <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M11 4h7M6 20h7M14 4 10 20" /></svg>
+)}
+export function IconUnderline(p) { return (
+  <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M6 4v7a6 6 0 0 0 12 0V4" /><path d="M5 20h14" /></svg>
+)}
+export function IconBulletList(p) { return (
+  <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" /></svg>
+)}
+export function IconNumberedList(p) { return (
+  <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><text x="1.5" y="8" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="1.5" y="14" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="1.5" y="20" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
+)}

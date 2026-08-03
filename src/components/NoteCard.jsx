@@ -3,6 +3,7 @@ import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { stripHtml } from '../lib/richText.js'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -97,7 +98,7 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
 
     const parts = []
     if (note.title) parts.push(note.title)
-    if (note.text) parts.push(note.text)
+    if (note.text) parts.push(stripHtml(note.text))
     if (note.checklist?.length) {
       parts.push(note.checklist.map((c) => `${c.done ? '\u2611' : '\u2610'} ${c.text}`).join('\n'))
     }
@@ -220,7 +221,7 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         </div>
       )}
 
-      {note.text && <p>{note.text}</p>}
+      {note.text && <div className="note-card-text" dangerouslySetInnerHTML={{ __html: note.text }} />}
 
       {note.checklist?.length > 0 && (
         <div onClick={(e) => e.stopPropagation()}>

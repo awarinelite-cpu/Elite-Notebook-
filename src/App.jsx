@@ -18,6 +18,7 @@ import DrivePanel from './components/DrivePanel.jsx'
 import Fab from './components/Fab.jsx'
 import DrawingCanvas from './components/DrawingCanvas.jsx'
 import AudioRecorder from './components/AudioRecorder.jsx'
+import { stripHtml } from './lib/richText.js'
 import Toast from './components/Toast.jsx'
 import { takePendingShare } from './shareTargetDb.js'
 
@@ -92,7 +93,7 @@ export default function App() {
       list = list.filter(
         (n) =>
           n.title?.toLowerCase().includes(q) ||
-          n.text?.toLowerCase().includes(q) ||
+          stripHtml(n.text).toLowerCase().includes(q) ||
           n.checklist?.some((c) => c.text?.toLowerCase().includes(q))
       )
     }
@@ -216,6 +217,7 @@ export default function App() {
 
       {editingNote && (
         <NoteEditorModal
+          key={editingNote.id}
           note={editingNote}
           labels={labels}
           onClose={() => setEditingNote(null)}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
@@ -54,6 +54,8 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const fileInput = useRef(null)
   const docInput = useRef(null)
+  const textEditorRef = useRef(null)
+  const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false, ul: false, ol: false })
   const uploading = images.some(isUploading)
   const audioUploading = audioClips.some(isUploading)
   const docsUploading = attachments.some((a) => a.uploading)
@@ -66,6 +68,14 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     if (base.pendingFiles?.length) uploadFiles(base.pendingFiles)
     if (base.pendingAudioFiles?.length) uploadAudioClips(base.pendingAudioFiles)
     if (base.pendingDocFiles?.length) uploadAttachments(base.pendingDocFiles)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // The editable text area is uncontrolled after this - its own onInput keeps
+  // `text` in sync - so the caret never jumps mid-typing the way it would if
+  // React re-set innerHTML on every keystroke.
+  useEffect(() => {
+    if (textEditorRef.current) textEditorRef.current.innerHTML = base.text || ''
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -118,6 +128,34 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
 
   function removeItem(idx) {
     setChecklist(checklist.filter((_, i) => i !== idx))
+  }
+
+  // Reflects the current selection's formatting on the toolbar buttons
+  // (e.g. the Bold button lights up while the cursor sits in bold text).
+  function refreshActiveFormats() {
+    if (!document.queryCommandState) return
+    setActiveFormats({
+      bold: document.queryCommandState('bold'),
+      italic: document.queryCommandState('italic'),
+      underline: document.queryCommandState('underline'),
+      ul: document.queryCommandState('insertUnorderedList'),
+      ol: document.queryCommandState('insertOrderedList'),
+    })
+  }
+
+  // Word-style formatting toolbar: bold/italic/underline/lists via the
+  // browser's built-in rich-text editing commands. onMouseDown (rather than
+  // onClick) with preventDefault keeps the text selection intact so the
+  // command applies to what's highlighted instead of losing focus first.
+  function applyFormat(command) {
+    textEditorRef.current?.focus()
+    document.execCommand(command, false, null)
+    setText(textEditorRef.current?.innerHTML || '')
+    refreshActiveFormats()
+  }
+
+  function handleTextInput(e) {
+    setText(e.currentTarget.innerHTML)
   }
 
   // Adds a placeholder for each file immediately (so it's visible with a
@@ -389,13 +427,63 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         )}
 
         {!isChecklist ? (
-          <textarea
-            placeholder="Take a note..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="note-editor-textarea"
-            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 10, resize: 'none', fontFamily: 'inherit' }}
-          />
+          <>
+            <div className="format-toolbar" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className={`icon-btn ${activeFormats.bold ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); applyFormat('bold') }}
+                title="Bold"
+              >
+                <IconBold />
+              </button>
+              <button
+                type="button"
+                className={`icon-btn ${activeFormats.italic ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); applyFormat('italic') }}
+                title="Italic"
+              >
+                <IconItalic />
+              </button>
+              <button
+                type="button"
+                className={`icon-btn ${activeFormats.underline ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); applyFormat('underline') }}
+                title="Underline"
+              >
+                <IconUnderline />
+              </button>
+              <span className="format-toolbar-divider" />
+              <button
+                type="button"
+                className={`icon-btn ${activeFormats.ul ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); applyFormat('insertUnorderedList') }}
+                title="Bulleted list"
+              >
+                <IconBulletList />
+              </button>
+              <button
+                type="button"
+                className={`icon-btn ${activeFormats.ol ? 'active' : ''}`}
+                onMouseDown={(e) => { e.preventDefault(); applyFormat('insertOrderedList') }}
+                title="Numbered list"
+              >
+                <IconNumberedList />
+              </button>
+            </div>
+            <div
+              ref={textEditorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleTextInput}
+              onKeyUp={refreshActiveFormats}
+              onMouseUp={refreshActiveFormats}
+              onFocus={refreshActiveFormats}
+              data-placeholder="Take a note..."
+              className="note-editor-textarea note-editor-richtext"
+              style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 6, fontFamily: 'inherit' }}
+            />
+          </>
         ) : (
           <div style={{ marginTop: 10 }}>
             {checklist.map((item, idx) => (
