@@ -4,6 +4,7 @@ import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
 import { useSecurity } from './hooks/useSecurity.js'
 import { usePrefetchAttachments } from './hooks/usePrefetchAttachments.js'
+import { useInstallPrompt } from './hooks/useInstallPrompt.js'
 import Login from './components/Login.jsx'
 import SecurityLock from './components/SecurityLock.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -28,6 +29,14 @@ export default function App() {
   const { labels, createLabel, deleteLabel } = useLabels()
   const security = useSecurity()
   usePrefetchAttachments(security.unlocked ? notes : null)
+  const install = useInstallPrompt()
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(
+    () => localStorage.getItem('install-banner-dismissed') === '1'
+  )
+  function dismissInstallBanner() {
+    localStorage.setItem('install-banner-dismissed', '1')
+    setInstallBannerDismissed(true)
+  }
 
   const [view, setView] = useState('notes')
   const [search, setSearch] = useState('')
@@ -157,6 +166,17 @@ export default function App() {
       />
 
       <div className="content">
+        {!install.standalone && install.canPromptInstall && !installBannerDismissed && (
+          <div className="install-banner">
+            <span>Install Elite Notebook for the full app experience — works offline, opens like any other app.</span>
+            <div className="install-banner-actions">
+              <button onClick={install.promptInstall}>Install</button>
+              <button className="install-banner-dismiss" onClick={dismissInstallBanner} aria-label="Dismiss">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         {error && (
           <div className="error-banner">
             Couldn't reach your notes: {error} — check your Firestore rules are published.

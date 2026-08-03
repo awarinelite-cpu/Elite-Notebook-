@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
-import { IconSignOut, IconMoon, IconSun, IconLock } from './Icons.jsx'
+import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
+import { IconSignOut, IconMoon, IconSun, IconLock, IconDownload } from './Icons.jsx'
 import { PinModal } from './SecurityLock.jsx'
 
 const rowStyle = {
@@ -20,6 +21,7 @@ const rowStyle = {
 export default function SettingsPanel({ security }) {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const install = useInstallPrompt()
   const [pinModal, setPinModal] = useState(null) // 'setup' | 'change' | 'remove' | null
 
   return (
@@ -67,6 +69,25 @@ export default function SettingsPanel({ security }) {
         {theme === 'dark' ? <IconSun /> : <IconMoon />}
         {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
       </button>
+
+      {!install.standalone && install.canPromptInstall && (
+        <button style={rowStyle} onClick={install.promptInstall}>
+          <IconDownload />
+          Install app
+        </button>
+      )}
+
+      {!install.standalone && !install.canPromptInstall && install.isIOS && (
+        <div style={{ ...rowStyle, alignItems: 'flex-start', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconDownload />
+            Install app
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', paddingLeft: 30 }}>
+            Tap Share, then "Add to Home Screen" to install.
+          </div>
+        </div>
+      )}
 
       {security && !security.loading && (
         <>
