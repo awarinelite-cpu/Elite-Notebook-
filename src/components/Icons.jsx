@@ -54,6 +54,12 @@ export function IconChecklist(p) { return (
 export function IconText(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M5 6h14M12 6v14" /></svg>
 )}
+export function IconBack(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M19 12H5M5 12l6-6M5 12l6 6" /></svg>
+)}
+export function IconMoreVert(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p} fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
+)}
 export function IconStop(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p} fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
 )}

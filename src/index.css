@@ -561,6 +561,55 @@ a {
   background: rgba(95, 99, 104, 0.1);
 }
 
+.icon-btn.active {
+  color: var(--ink);
+  background: rgba(95, 99, 104, 0.16);
+}
+
+.note-editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: -4px -4px 6px;
+}
+
+.more-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  z-index: 5;
+}
+
+.more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.more-menu-item:hover {
+  background: var(--surface-soft);
+}
+
+.more-menu-item:disabled {
+  opacity: 0.5;
+}
+
 /* ---------- Empty state ---------- */
 .empty-state {
   flex: 1;

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
 import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 
-const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null }
+const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
 
 // An image slot is either a finished string URL, or a placeholder object
 // `{ id, previewUrl, uploading: true }` shown instantly (with a spinner)
@@ -47,6 +47,11 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
+  const [pinned, setPinned] = useState(!!base.pinned)
+  const [archived, setArchived] = useState(!!base.archived)
+  const [showReminder, setShowReminder] = useState(false)
+  const [showColors, setShowColors] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const fileInput = useRef(null)
   const docInput = useRef(null)
   const uploading = images.some(isUploading)
@@ -76,6 +81,8 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       audio: audioClips.filter((clip) => typeof clip === 'string'),
       files: attachments.filter((a) => !a.uploading).map((a) => ({ url: a.url, name: a.name, size: a.size, type: a.type })),
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
+      pinned,
+      archived,
     }
   }
 
@@ -245,6 +252,27 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         style={{ background: background !== 'none' ? NOTE_BACKGROUNDS[background] : NOTE_COLORS[color] }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="note-editor-topbar">
+          <button className="icon-btn" onClick={handleClose} title="Back">
+            <IconBack width="20" height="20" />
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="icon-btn" onClick={() => setPinned((v) => !v)} title={pinned ? 'Unpin' : 'Pin'}>
+            {pinned ? <IconUnpin width="19" height="19" /> : <IconPin width="19" height="19" />}
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => setShowReminder((v) => !v)}
+            title="Reminder"
+            style={reminderAt ? { color: 'var(--accent)' } : undefined}
+          >
+            <IconBell width="19" height="19" />
+          </button>
+          <button className="icon-btn" onClick={() => setArchived((v) => !v)} title={archived ? 'Unarchive' : 'Archive'}>
+            <IconArchive width="19" height="19" />
+          </button>
+        </div>
+
         <input
           type="text"
           placeholder="Title"
@@ -386,16 +414,23 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           </div>
         )}
 
-        <div style={{ marginTop: 14 }}>
-          <label style={{ fontSize: 11, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Reminder</label>
-          <br />
-          <input
-            type="datetime-local"
-            value={reminderAt}
-            onChange={(e) => setReminderAt(e.target.value)}
-            style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)' }}
-          />
-        </div>
+        {showReminder && (
+          <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+            <label style={{ fontSize: 11, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Remind me</label>
+            <br />
+            <input
+              type="datetime-local"
+              value={reminderAt}
+              onChange={(e) => setReminderAt(e.target.value)}
+              style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)' }}
+            />
+            {reminderAt && (
+              <button className="icon-btn" title="Clear reminder" onClick={() => setReminderAt('')} style={{ marginLeft: 6 }}>
+                <IconClose width="14" height="14" />
+              </button>
+            )}
+          </div>
+        )}
 
         {labels.length > 0 && (
           <div className="note-labels" style={{ marginTop: 14 }}>
@@ -416,57 +451,71 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           </div>
         )}
 
-        <div className="color-swatches">
-          {Object.entries(NOTE_COLORS).map(([name, hex]) => (
-            <button
-              key={name}
-              className={`swatch ${background === 'none' && color === name ? 'selected' : ''}`}
-              style={{ background: hex }}
-              onClick={() => { setColor(name); setBackground('none') }}
-              aria-label={name}
-            />
-          ))}
-        </div>
+        {showColors && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <div className="color-swatches">
+              {Object.entries(NOTE_COLORS).map(([name, hex]) => (
+                <button
+                  key={name}
+                  className={`swatch ${background === 'none' && color === name ? 'selected' : ''}`}
+                  style={{ background: hex }}
+                  onClick={() => { setColor(name); setBackground('none') }}
+                  aria-label={name}
+                />
+              ))}
+            </div>
 
-        <div className="bg-swatches">
-          {Object.entries(NOTE_BACKGROUNDS).map(([name, css]) => (
-            <button
-              key={name}
-              className={`bg-swatch ${background === name ? 'selected' : ''}`}
-              style={{ background: css }}
-              onClick={() => setBackground(name)}
-              aria-label={NOTE_BACKGROUND_LABELS[name]}
-              title={NOTE_BACKGROUND_LABELS[name]}
-            />
-          ))}
-        </div>
+            <div className="bg-swatches">
+              {Object.entries(NOTE_BACKGROUNDS).map(([name, css]) => (
+                <button
+                  key={name}
+                  className={`bg-swatch ${background === name ? 'selected' : ''}`}
+                  style={{ background: css }}
+                  onClick={() => setBackground(name)}
+                  aria-label={NOTE_BACKGROUND_LABELS[name]}
+                  title={NOTE_BACKGROUND_LABELS[name]}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div className="composer-row">
-          <button className="icon-btn" onClick={() => setIsChecklist((v) => !v)} title="Toggle checklist">
-            <IconChecklist width="18" height="18" />
-          </button>
+        <div className="composer-row" style={{ position: 'relative' }}>
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
             {uploading ? '...' : <IconImage width="18" height="18" />}
           </button>
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={handleFile} />
-          <button className="icon-btn" onClick={() => setSubTool('drawing')} title="Add drawing">
-            <IconDrawing width="18" height="18" />
+          <button className={`icon-btn ${showColors ? 'active' : ''}`} onClick={() => setShowColors((v) => !v)} title="Background options">
+            <IconWallpaper width="18" height="18" />
           </button>
-          <button className="icon-btn" onClick={() => setSubTool('audio')} title="Record voice memo" disabled={audioUploading}>
-            {audioUploading ? '...' : <IconMic width="18" height="18" />}
+          <button className={`icon-btn ${isChecklist ? 'active' : ''}`} onClick={() => setIsChecklist((v) => !v)} title="Toggle checklist">
+            <IconChecklist width="18" height="18" />
           </button>
-          <button className="icon-btn" onClick={() => docInput.current?.click()} title="Attach file" disabled={docsUploading}>
-            {docsUploading ? '...' : <IconAttachment width="18" height="18" />}
-          </button>
-          <input ref={docInput} type="file" multiple hidden onChange={handleDocFile} />
-          {!isNew && (
-            <button className="icon-btn" title="Delete forever" onClick={() => { onDeleteForever(note.id); onClose() }}>
-              <IconTrash width="18" height="18" />
+
+          <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            <button className="icon-btn" onClick={() => setShowMoreMenu((v) => !v)} title="More options">
+              <IconMoreVert width="19" height="19" />
             </button>
-          )}
-          <button className="pill-btn" style={{ marginLeft: 'auto' }} onClick={handleClose}>
-            Close
-          </button>
+            {showMoreMenu && (
+              <div className="more-menu">
+                <button className="more-menu-item" onClick={() => { setSubTool('drawing'); setShowMoreMenu(false) }}>
+                  <IconDrawing width="17" height="17" /> Add drawing
+                </button>
+                <button className="more-menu-item" onClick={() => { setSubTool('audio'); setShowMoreMenu(false) }} disabled={audioUploading}>
+                  <IconMic width="17" height="17" /> Record voice memo
+                </button>
+                <button className="more-menu-item" onClick={() => { docInput.current?.click(); setShowMoreMenu(false) }} disabled={docsUploading}>
+                  <IconAttachment width="17" height="17" /> Attach file
+                </button>
+                {!isNew && (
+                  <button className="more-menu-item" onClick={() => { onDeleteForever(note.id); onClose() }}>
+                    <IconTrash width="17" height="17" /> Delete forever
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <input ref={docInput} type="file" multiple hidden onChange={handleDocFile} />
         </div>
       </div>
 
