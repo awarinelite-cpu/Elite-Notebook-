@@ -290,7 +290,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         style={{ background: background !== 'none' ? NOTE_BACKGROUNDS[background] : NOTE_COLORS[color] }}
         onClick={(e) => e.stopPropagation()}
       >
-      <div className="note-editor-scroll">
+      <div className="note-editor-header">
         <div className="note-editor-topbar">
           <button className="icon-btn" onClick={handleClose} title="Back">
             <IconBack width="20" height="20" />
@@ -321,6 +321,54 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600 }}
         />
 
+        {!isChecklist && (
+          <div className="format-toolbar" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className={`icon-btn ${activeFormats.bold ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); applyFormat('bold') }}
+              title="Bold"
+            >
+              <IconBold />
+            </button>
+            <button
+              type="button"
+              className={`icon-btn ${activeFormats.italic ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); applyFormat('italic') }}
+              title="Italic"
+            >
+              <IconItalic />
+            </button>
+            <button
+              type="button"
+              className={`icon-btn ${activeFormats.underline ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); applyFormat('underline') }}
+              title="Underline"
+            >
+              <IconUnderline />
+            </button>
+            <span className="format-toolbar-divider" />
+            <button
+              type="button"
+              className={`icon-btn ${activeFormats.ul ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); applyFormat('insertUnorderedList') }}
+              title="Bulleted list"
+            >
+              <IconBulletList />
+            </button>
+            <button
+              type="button"
+              className={`icon-btn ${activeFormats.ol ? 'active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); applyFormat('insertOrderedList') }}
+              title="Numbered list"
+            >
+              <IconNumberedList />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="note-editor-scroll">
         {images.length > 0 && (
           <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
             {images.map((slot, i) => {
@@ -427,63 +475,18 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         )}
 
         {!isChecklist ? (
-          <>
-            <div className="format-toolbar" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className={`icon-btn ${activeFormats.bold ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); applyFormat('bold') }}
-                title="Bold"
-              >
-                <IconBold />
-              </button>
-              <button
-                type="button"
-                className={`icon-btn ${activeFormats.italic ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); applyFormat('italic') }}
-                title="Italic"
-              >
-                <IconItalic />
-              </button>
-              <button
-                type="button"
-                className={`icon-btn ${activeFormats.underline ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); applyFormat('underline') }}
-                title="Underline"
-              >
-                <IconUnderline />
-              </button>
-              <span className="format-toolbar-divider" />
-              <button
-                type="button"
-                className={`icon-btn ${activeFormats.ul ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); applyFormat('insertUnorderedList') }}
-                title="Bulleted list"
-              >
-                <IconBulletList />
-              </button>
-              <button
-                type="button"
-                className={`icon-btn ${activeFormats.ol ? 'active' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); applyFormat('insertOrderedList') }}
-                title="Numbered list"
-              >
-                <IconNumberedList />
-              </button>
-            </div>
-            <div
-              ref={textEditorRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={handleTextInput}
-              onKeyUp={refreshActiveFormats}
-              onMouseUp={refreshActiveFormats}
-              onFocus={refreshActiveFormats}
-              data-placeholder="Take a note..."
-              className="note-editor-textarea note-editor-richtext"
-              style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 6, fontFamily: 'inherit' }}
-            />
-          </>
+          <div
+            ref={textEditorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleTextInput}
+            onKeyUp={refreshActiveFormats}
+            onMouseUp={refreshActiveFormats}
+            onFocus={refreshActiveFormats}
+            data-placeholder="Take a note..."
+            className="note-editor-textarea note-editor-richtext"
+            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 6, fontFamily: 'inherit' }}
+          />
         ) : (
           <div style={{ marginTop: 10 }}>
             {checklist.map((item, idx) => (

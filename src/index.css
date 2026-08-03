@@ -874,6 +874,10 @@ a {
   background-position: center;
 }
 
+.note-editor-header {
+  flex-shrink: 0;
+}
+
 .note-editor-scroll {
   flex: 1;
   min-height: 0;
