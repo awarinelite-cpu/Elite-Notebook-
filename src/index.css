@@ -859,6 +859,7 @@ a {
 }
 
 .modal-card {
+  position: relative;
   background: var(--card-default);
   border-radius: 12px;
   width: 100%;
@@ -870,8 +871,29 @@ a {
   padding: 20px 24px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.28);
   border: 1px solid var(--border);
+}
+
+/* Wallpaper is painted on its own layer, pinned to the card's box,
+   so it can never appear to drift or scroll along with the text
+   content inside (a rendering glitch some mobile browsers have when
+   a background sits directly on a container with a scrolling child). */
+.modal-card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background-size: cover;
   background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.modal-card-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .note-editor-header {

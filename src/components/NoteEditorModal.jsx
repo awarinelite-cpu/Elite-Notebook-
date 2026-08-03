@@ -329,9 +329,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     <div className="modal-backdrop" onClick={handleClose}>
       <div
         className="modal-card"
-        style={{ background: background !== 'none' ? NOTE_BACKGROUNDS[background] : NOTE_COLORS[color] }}
+        style={{ background: background === 'none' ? NOTE_COLORS[color] : undefined }}
         onClick={(e) => e.stopPropagation()}
       >
+      {background !== 'none' && (
+        <div className="modal-card-bg" style={{ background: NOTE_BACKGROUNDS[background] }} />
+      )}
+      <div className="modal-card-content">
       <div className="note-editor-header">
         <div className="note-editor-topbar">
           <button className="icon-btn" onClick={handleClose} title="Back">
@@ -674,6 +678,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           </div>
           <input ref={docInput} type="file" multiple hidden onChange={handleDocFile} />
         </div>
+      </div>
       </div>
 
       {lightboxIndex !== null && (
