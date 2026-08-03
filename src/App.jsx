@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext.jsx'
 import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
 import { useSecurity } from './hooks/useSecurity.js'
+import { usePrefetchAttachments } from './hooks/usePrefetchAttachments.js'
 import Login from './components/Login.jsx'
 import SecurityLock from './components/SecurityLock.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -26,6 +27,7 @@ export default function App() {
   const { notes, error, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
   const { labels, createLabel, deleteLabel } = useLabels()
   const security = useSecurity()
+  usePrefetchAttachments(security.unlocked ? notes : null)
 
   const [view, setView] = useState('notes')
   const [search, setSearch] = useState('')
