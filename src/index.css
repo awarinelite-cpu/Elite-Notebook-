@@ -886,6 +886,12 @@ a {
   flex-direction: column;
 }
 
+.note-editor-attachments {
+  flex-shrink: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
 .note-editor-textarea {
   flex: 1;
   min-height: 160px;

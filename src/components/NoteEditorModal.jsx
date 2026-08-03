@@ -369,111 +369,6 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       </div>
 
       <div className="note-editor-scroll">
-        {images.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
-            {images.map((slot, i) => {
-              const pending = isUploading(slot)
-              return (
-                <div key={pending ? slot.id : `${slot}-${i}`} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
-                  <img
-                    src={srcOf(slot)}
-                    alt=""
-                    style={{
-                      width: 96,
-                      height: 96,
-                      objectFit: 'cover',
-                      borderRadius: 8,
-                      cursor: pending ? 'default' : 'pointer',
-                      opacity: pending ? 0.6 : 1,
-                    }}
-                    onClick={() => !pending && setLightboxIndex(i)}
-                  />
-                  {pending && (
-                    <div className="thumb-spinner" aria-label="Uploading">
-                      <span className="spinner" />
-                    </div>
-                  )}
-                  <button
-                    className="thumb-remove"
-                    title="Remove image"
-                    onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                  >
-                    <IconClose width="12" height="12" />
-                  </button>
-                  {!pending && (
-                    <button
-                      className="thumb-edit"
-                      title="Edit image"
-                      onClick={() => setEditingImage(i)}
-                    >
-                      <IconEdit width="12" height="12" />
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {audioClips.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
-            {audioClips.map((clip, i) => {
-              const pending = isUploading(clip)
-              return (
-                <div key={pending ? clip.id : `${clip}-${i}`} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
-                  {pending ? (
-                    <>
-                      <span className="spinner" />
-                      <span className="audio-clip-label">Uploading voice memo…</span>
-                    </>
-                  ) : (
-                    <>
-                      <IconMic width="16" height="16" />
-                      <audio controls src={clip} style={{ flex: 1, height: 32 }} />
-                    </>
-                  )}
-                  <button
-                    className="icon-btn"
-                    title="Remove voice memo"
-                    onClick={() => setAudioClips((clips) => clips.filter((_, idx) => idx !== i))}
-                  >
-                    <IconClose width="14" height="14" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {attachments.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
-            {attachments.map((a) => (
-              <div key={a.id || a.url} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
-                {a.uploading ? (
-                  <>
-                    <span className="spinner" />
-                    <span className="audio-clip-label">Uploading {a.name}…</span>
-                  </>
-                ) : (
-                  <>
-                    <IconFileDoc width="16" height="16" />
-                    <a href={a.url} target="_blank" rel="noreferrer" className="audio-clip-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {a.name} {a.size ? `· ${formatBytes(a.size)}` : ''}
-                    </a>
-                  </>
-                )}
-                <button
-                  className="icon-btn"
-                  title="Remove file"
-                  onClick={() => setAttachments((atts) => atts.filter((x) => x !== a))}
-                >
-                  <IconClose width="14" height="14" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {!isChecklist ? (
           <div
             ref={textEditorRef}
@@ -573,6 +468,115 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         )}
 
       </div>
+
+        {(images.length > 0 || audioClips.length > 0 || attachments.length > 0) && (
+          <div className="note-editor-attachments">
+            {images.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
+                {images.map((slot, i) => {
+                  const pending = isUploading(slot)
+                  return (
+                    <div key={pending ? slot.id : `${slot}-${i}`} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
+                      <img
+                        src={srcOf(slot)}
+                        alt=""
+                        style={{
+                          width: 96,
+                          height: 96,
+                          objectFit: 'cover',
+                          borderRadius: 8,
+                          cursor: pending ? 'default' : 'pointer',
+                          opacity: pending ? 0.6 : 1,
+                        }}
+                        onClick={() => !pending && setLightboxIndex(i)}
+                      />
+                      {pending && (
+                        <div className="thumb-spinner" aria-label="Uploading">
+                          <span className="spinner" />
+                        </div>
+                      )}
+                      <button
+                        className="thumb-remove"
+                        title="Remove image"
+                        onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
+                      >
+                        <IconClose width="12" height="12" />
+                      </button>
+                      {!pending && (
+                        <button
+                          className="thumb-edit"
+                          title="Edit image"
+                          onClick={() => setEditingImage(i)}
+                        >
+                          <IconEdit width="12" height="12" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {audioClips.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
+                {audioClips.map((clip, i) => {
+                  const pending = isUploading(clip)
+                  return (
+                    <div key={pending ? clip.id : `${clip}-${i}`} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
+                      {pending ? (
+                        <>
+                          <span className="spinner" />
+                          <span className="audio-clip-label">Uploading voice memo…</span>
+                        </>
+                      ) : (
+                        <>
+                          <IconMic width="16" height="16" />
+                          <audio controls src={clip} style={{ flex: 1, height: 32 }} />
+                        </>
+                      )}
+                      <button
+                        className="icon-btn"
+                        title="Remove voice memo"
+                        onClick={() => setAudioClips((clips) => clips.filter((_, idx) => idx !== i))}
+                      >
+                        <IconClose width="14" height="14" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {attachments.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
+                {attachments.map((a) => (
+                  <div key={a.id || a.url} className="audio-clip-row" onClick={(e) => e.stopPropagation()}>
+                    {a.uploading ? (
+                      <>
+                        <span className="spinner" />
+                        <span className="audio-clip-label">Uploading {a.name}…</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconFileDoc width="16" height="16" />
+                        <a href={a.url} target="_blank" rel="noreferrer" className="audio-clip-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.name} {a.size ? `· ${formatBytes(a.size)}` : ''}
+                        </a>
+                      </>
+                    )}
+                    <button
+                      className="icon-btn"
+                      title="Remove file"
+                      onClick={() => setAttachments((atts) => atts.filter((x) => x !== a))}
+                    >
+                      <IconClose width="14" height="14" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="composer-row" style={{ position: 'relative' }}>
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
