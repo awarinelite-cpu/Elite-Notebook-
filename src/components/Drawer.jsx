@@ -1,4 +1,4 @@
-import { IconBulb, IconBell, IconPlus, IconArchive, IconTrash, IconSettings, IconHelp, IconDrive } from './Icons.jsx'
+import { IconBulb, IconBell, IconPlus, IconArchive, IconTrash, IconSettings, IconHelp, IconDrive, IconImport } from './Icons.jsx'
 
 export default function Drawer({ open, view, setView, onClose }) {
   if (!open) return null
@@ -46,6 +46,10 @@ export default function Drawer({ open, view, setView, onClose }) {
         <button className={`drawer-item ${view === 'drive' ? 'active' : ''}`} onClick={() => go('drive')}>
           <IconDrive className="drawer-icon-svg" />
           Drive
+        </button>
+        <button className={`drawer-item ${view === 'keep-import' ? 'active' : ''}`} onClick={() => go('keep-import')}>
+          <IconImport className="drawer-icon-svg" />
+          Import from Keep
         </button>
 
         <div className="drawer-gap" />

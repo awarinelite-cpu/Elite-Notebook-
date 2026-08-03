@@ -69,10 +69,11 @@ export function useNotes() {
         color: data.color || 'default',
         background: data.background || 'none',
         labels: data.labels || [],
-        pinned: false,
-        archived: false,
+        pinned: data.pinned || false,
+        archived: data.archived || false,
         trashed: false,
         reminderAt: data.reminderAt || null,
+        keepId: data.keepId || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })

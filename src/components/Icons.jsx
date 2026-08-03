@@ -138,6 +138,9 @@ export function IconLock(p) { return (
 export function IconDownload(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 19h16" /></svg>
 )}
+export function IconImport(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M4 4v9a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V4" /><path d="M12 3v10" /><path d="M8.5 9.5L12 13l3.5-3.5" /></svg>
+)}
 export function IconBold(p) { return (
   <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M7 4h6a3.5 3.5 0 0 1 0 7H7z" /><path d="M7 11h7a3.5 3.5 0 0 1 0 7H7z" /></svg>
 )}

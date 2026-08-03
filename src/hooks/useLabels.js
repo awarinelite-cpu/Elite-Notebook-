@@ -20,8 +20,9 @@ export function useLabels() {
   }, [user])
 
   async function createLabel(name) {
-    if (!user || !name.trim()) return
-    await addDoc(collection(db, 'labels'), { uid: user.uid, name: name.trim() })
+    if (!user || !name.trim()) return null
+    const ref = await addDoc(collection(db, 'labels'), { uid: user.uid, name: name.trim() })
+    return ref.id
   }
 
   async function deleteLabel(id) {

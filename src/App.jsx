@@ -15,6 +15,7 @@ import LabelManager from './components/LabelManager.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
 import DrivePanel from './components/DrivePanel.jsx'
+import KeepImportPanel from './components/KeepImportPanel.jsx'
 import Fab from './components/Fab.jsx'
 import DrawingCanvas from './components/DrawingCanvas.jsx'
 import AudioRecorder from './components/AudioRecorder.jsx'
@@ -22,7 +23,7 @@ import { stripHtml } from './lib/richText.js'
 import Toast from './components/Toast.jsx'
 import { takePendingShare } from './shareTargetDb.js'
 
-const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive']
+const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive', 'keep-import']
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -187,6 +188,9 @@ export default function App() {
         {view === 'settings' && <SettingsPanel security={security} />}
         {view === 'help' && <HelpPanel />}
         {view === 'drive' && <DrivePanel />}
+        {view === 'keep-import' && (
+          <KeepImportPanel notes={notes} labels={labels} createNote={createNote} createLabel={createLabel} />
+        )}
         {!PANEL_VIEWS.includes(view) && (
           <NoteGrid
             notes={filtered}
