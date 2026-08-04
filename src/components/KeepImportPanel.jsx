@@ -19,14 +19,23 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
   const [error, setError] = useState(null)
 
   async function handleFiles(e) {
-    const files = Array.from(e.target.files || [])
+    const allFiles = Array.from(e.target.files || [])
     e.target.value = ''
-    if (!files.length) return
+    if (!allFiles.length) return
+
+    const files = allFiles.filter((f) => /\.zip$/i.test(f.name))
+    const ignored = allFiles.length - files.length
 
     setBusy(true)
     setError(null)
     setResult(null)
     setProgress(null)
+
+    if (!files.length) {
+      setBusy(false)
+      setError("That doesn't look like a Keep export — pick the .zip file(s) from Google Takeout.")
+      return
+    }
 
     // Notes already imported before carry the keepId they were imported
     // with, so re-running an import (e.g. after adding new Keep notes)
@@ -96,7 +105,7 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
       }
     }
 
-    setResult({ imported, skippedDuplicate, skippedTrashed, attachmentsSkipped })
+    setResult({ imported, skippedDuplicate, skippedTrashed, attachmentsSkipped, ignored })
     if (fileErrors.length) {
       setError(
         `${fileErrors.length} of ${files.length} file${files.length === 1 ? '' : 's'} couldn't be read: ${fileErrors.join('; ')}`
@@ -126,20 +135,17 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
             Export, then download the file(s) — a large Keep library often comes as several
             numbered .zip parts (e.g. "-001", "-002"); select all of them at once below
           </li>
+          <li>
+            If the upload picker doesn't show them under "Recent", tap its menu (☰) and look in
+            "Downloads" instead
+          </li>
         </ol>
 
         <button className="pill-btn" disabled={busy} onClick={() => fileInput.current?.click()}>
           <IconImport width="16" height="16" />
           {busy ? 'Importing…' : 'Upload Keep export (.zip)'}
         </button>
-        <input
-          ref={fileInput}
-          type="file"
-          multiple
-          accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream"
-          hidden
-          onChange={handleFiles}
-        />
+        <input ref={fileInput} type="file" multiple hidden onChange={handleFiles} />
 
         {progress && (
           <p style={{ marginTop: 10, color: 'var(--ink-soft)' }}>
@@ -167,6 +173,12 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
                 Note: {result.attachmentsSkipped} image/drawing attachment
                 {result.attachmentsSkipped === 1 ? '' : 's'} in Keep couldn't be brought over — only
                 text and checklists are imported for now
+              </div>
+            )}
+            {result.ignored > 0 && (
+              <div style={{ color: 'var(--ink-soft)' }}>
+                Ignored {result.ignored} selected file{result.ignored === 1 ? '' : 's'} that
+                weren't .zip files
               </div>
             )}
           </div>
