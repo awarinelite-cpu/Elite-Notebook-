@@ -189,7 +189,13 @@ export default function App() {
         {view === 'help' && <HelpPanel />}
         {view === 'drive' && <DrivePanel />}
         {view === 'keep-import' && (
-          <KeepImportPanel notes={notes} labels={labels} createNote={createNote} createLabel={createLabel} />
+          <KeepImportPanel
+            notes={notes}
+            labels={labels}
+            createNote={createNote}
+            createLabel={createLabel}
+            uploadImage={uploadImage}
+          />
         )}
         {!PANEL_VIEWS.includes(view) && (
           <NoteGrid

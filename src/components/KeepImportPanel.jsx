@@ -11,7 +11,7 @@ const rowStyle = {
   marginBottom: 10,
 }
 
-export default function KeepImportPanel({ notes, labels, createNote, createLabel }) {
+export default function KeepImportPanel({ notes, labels, createNote, createLabel, uploadImage }) {
   const fileInput = useRef(null)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(null) // { done, total }
@@ -53,9 +53,11 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
 
     for (const file of files) {
       let parsed
+      let zip
       try {
         const out = await parseKeepZip(file)
         parsed = out.notes
+        zip = out.zip
         skippedTrashed += out.skippedTrashed
         attachmentsSkipped += out.attachmentsSkipped
       } catch (err) {
@@ -85,6 +87,33 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
             if (id) labelIds.push(id)
           }
 
+          // Each attachment is pulled out of the zip and uploaded one at a
+          // time (not all at once), so memory use stays flat regardless of
+          // how many photos a note has.
+          const images = []
+          const audio = []
+          const noteFiles = []
+          for (const att of note.attachments) {
+            if (!uploadImage) {
+              attachmentsSkipped += 1
+              continue
+            }
+            try {
+              const entry = zip.file(att.entryName)
+              const blob = await entry.async('blob')
+              const filename = att.entryName.split('/').pop()
+              const attFile = new File([blob], filename, { type: att.mimetype || blob.type })
+              const url = await uploadImage(attFile)
+              if (!url) throw new Error('upload returned no URL')
+              if (att.mimetype.startsWith('image/')) images.push(url)
+              else if (att.mimetype.startsWith('audio/')) audio.push(url)
+              else noteFiles.push({ url, name: filename, size: attFile.size, type: attFile.type })
+            } catch (err) {
+              console.error('Keep import: attachment upload failed:', err)
+              attachmentsSkipped += 1
+            }
+          }
+
           await createNote({
             title: note.title,
             text: note.text,
@@ -94,6 +123,9 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
             archived: note.archived,
             labels: labelIds,
             keepId: note.keepId,
+            images,
+            audio,
+            files: noteFiles,
           })
 
           seenKeepIds.add(note.keepId) // guard duplicate entries within the same zip/run
@@ -170,9 +202,8 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
             )}
             {result.attachmentsSkipped > 0 && (
               <div style={{ color: 'var(--ink-soft)' }}>
-                Note: {result.attachmentsSkipped} image/drawing attachment
-                {result.attachmentsSkipped === 1 ? '' : 's'} in Keep couldn't be brought over — only
-                text and checklists are imported for now
+                {result.attachmentsSkipped} attachment{result.attachmentsSkipped === 1 ? '' : 's'}{' '}
+                couldn't be brought over (missing from this zip part, or failed to upload)
               </div>
             )}
             {result.ignored > 0 && (

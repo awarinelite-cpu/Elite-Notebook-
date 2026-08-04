@@ -43,7 +43,9 @@ function keepIdFor(raw) {
 /**
  * Reads a Google Takeout "Keep" export (.zip) and returns the notes inside
  * it in Elite Notebook's shape, ready to hand to createNote. Does not write
- * anything itself — the caller decides what to do with duplicates.
+ * anything itself, and doesn't extract attachment bytes yet — each note's
+ * `attachments` list points at zip entry names for the caller to pull out
+ * (via the returned `zip`) and upload one at a time, alongside `zip` itself.
  */
 export async function parseKeepZip(file) {
   const zip = await JSZip.loadAsync(file)
@@ -71,8 +73,20 @@ export async function parseKeepZip(file) {
       continue
     }
 
-    if (Array.isArray(raw.attachments) && raw.attachments.length) {
-      attachmentsSkipped += raw.attachments.length
+    // Attachment files sit alongside the note's own JSON inside the zip
+    // (Takeout doesn't give a full path, just a filename), so resolve each
+    // one against the JSON entry's own directory. Any that can't be found
+    // (e.g. split across a different zip part than its note) are counted
+    // as skipped rather than failing the whole note.
+    const dir = entry.name.includes('/') ? entry.name.slice(0, entry.name.lastIndexOf('/') + 1) : ''
+    const attachments = []
+    for (const att of Array.isArray(raw.attachments) ? raw.attachments : []) {
+      const zipEntry = att.filePath && zip.file(dir + att.filePath)
+      if (zipEntry) {
+        attachments.push({ entryName: zipEntry.name, mimetype: att.mimetype || '' })
+      } else {
+        attachmentsSkipped += 1
+      }
     }
 
     const hasChecklist = Array.isArray(raw.listContent) && raw.listContent.length > 0
@@ -92,8 +106,9 @@ export async function parseKeepZip(file) {
       pinned: !!raw.isPinned,
       archived: !!raw.isArchived,
       labelNames: Array.isArray(raw.labels) ? raw.labels.map((l) => l.name).filter(Boolean) : [],
+      attachments,
     })
   }
 
-  return { notes, skippedTrashed, attachmentsSkipped }
+  return { zip, notes, skippedTrashed, attachmentsSkipped }
 }
