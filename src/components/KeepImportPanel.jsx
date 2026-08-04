@@ -18,28 +18,44 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
 
-  async function handleFile(e) {
-    const file = e.target.files?.[0]
+  async function handleFiles(e) {
+    const files = Array.from(e.target.files || [])
     e.target.value = ''
-    if (!file) return
+    if (!files.length) return
 
     setBusy(true)
     setError(null)
     setResult(null)
     setProgress(null)
 
-    try {
-      const { notes: parsed, skippedTrashed, attachmentsSkipped } = await parseKeepZip(file)
+    // Notes already imported before carry the keepId they were imported
+    // with, so re-running an import (e.g. after adding new Keep notes)
+    // only creates the ones that aren't here yet. This also guards across
+    // the multiple zip parts Takeout splits a large export into — a note
+    // won't be created twice even if two parts somehow overlapped.
+    const seenKeepIds = new Set(notes.filter((n) => n.keepId).map((n) => n.keepId))
+    const labelIdByName = new Map(labels.map((l) => [l.name.toLowerCase(), l.id]))
 
-      // Notes already imported before carry the keepId they were imported
-      // with, so re-running an import (e.g. after adding new Keep notes)
-      // only creates the ones that aren't here yet.
-      const seenKeepIds = new Set(notes.filter((n) => n.keepId).map((n) => n.keepId))
-      const labelIdByName = new Map(labels.map((l) => [l.name.toLowerCase(), l.id]))
+    let imported = 0
+    let skippedDuplicate = 0
+    let skippedTrashed = 0
+    let attachmentsSkipped = 0
+    const fileErrors = []
 
-      let imported = 0
-      let skippedDuplicate = 0
-      setProgress({ done: 0, total: parsed.length })
+    for (const file of files) {
+      let parsed
+      try {
+        const out = await parseKeepZip(file)
+        parsed = out.notes
+        skippedTrashed += out.skippedTrashed
+        attachmentsSkipped += out.attachmentsSkipped
+      } catch (err) {
+        console.error(`Keep import failed on ${file.name}:`, err)
+        fileErrors.push(`${file.name}: ${err.message || 'could not be read'}`)
+        continue
+      }
+
+      setProgress((p) => ({ done: 0, total: (p?.total || 0) + parsed.length }))
 
       for (const note of parsed) {
         if (seenKeepIds.has(note.keepId)) {
@@ -48,41 +64,46 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
           continue
         }
 
-        const labelIds = []
-        for (const name of note.labelNames) {
-          const key = name.toLowerCase()
-          let id = labelIdByName.get(key)
-          if (!id) {
-            id = await createLabel(name)
-            if (id) labelIdByName.set(key, id)
+        try {
+          const labelIds = []
+          for (const name of note.labelNames) {
+            const key = name.toLowerCase()
+            let id = labelIdByName.get(key)
+            if (!id) {
+              id = await createLabel(name)
+              if (id) labelIdByName.set(key, id)
+            }
+            if (id) labelIds.push(id)
           }
-          if (id) labelIds.push(id)
+
+          await createNote({
+            title: note.title,
+            text: note.text,
+            checklist: note.checklist,
+            color: note.color,
+            pinned: note.pinned,
+            archived: note.archived,
+            labels: labelIds,
+            keepId: note.keepId,
+          })
+
+          seenKeepIds.add(note.keepId) // guard duplicate entries within the same zip/run
+          imported += 1
+        } catch (err) {
+          console.error('Keep import: failed to create a note:', err)
         }
-
-        await createNote({
-          title: note.title,
-          text: note.text,
-          checklist: note.checklist,
-          color: note.color,
-          pinned: note.pinned,
-          archived: note.archived,
-          labels: labelIds,
-          keepId: note.keepId,
-        })
-
-        seenKeepIds.add(note.keepId) // guard duplicate entries within the same zip
-        imported += 1
         setProgress((p) => ({ ...p, done: p.done + 1 }))
       }
-
-      setResult({ imported, skippedDuplicate, skippedTrashed, attachmentsSkipped })
-    } catch (err) {
-      console.error('Keep import failed:', err)
-      setError("Couldn't read that file — make sure it's the .zip from Google Takeout with Keep selected.")
-    } finally {
-      setBusy(false)
-      setProgress(null)
     }
+
+    setResult({ imported, skippedDuplicate, skippedTrashed, attachmentsSkipped })
+    if (fileErrors.length) {
+      setError(
+        `${fileErrors.length} of ${files.length} file${files.length === 1 ? '' : 's'} couldn't be read: ${fileErrors.join('; ')}`
+      )
+    }
+    setBusy(false)
+    setProgress(null)
   }
 
   return (
@@ -101,7 +122,10 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
             </a>
           </li>
           <li>Deselect everything, then select only "Keep"</li>
-          <li>Export, download the .zip, then upload it below</li>
+          <li>
+            Export, then download the file(s) — a large Keep library often comes as several
+            numbered .zip parts (e.g. "-001", "-002"); select all of them at once below
+          </li>
         </ol>
 
         <button className="pill-btn" disabled={busy} onClick={() => fileInput.current?.click()}>
@@ -111,9 +135,10 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
         <input
           ref={fileInput}
           type="file"
+          multiple
           accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream"
           hidden
-          onChange={handleFile}
+          onChange={handleFiles}
         />
 
         {progress && (
