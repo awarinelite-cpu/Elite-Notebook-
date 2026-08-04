@@ -11,12 +11,45 @@ const rowStyle = {
   marginBottom: 10,
 }
 
-export default function KeepImportPanel({ notes, labels, createNote, createLabel, uploadImage }) {
+export default function KeepImportPanel({ notes, labels, createNote, createLabel, uploadImage, deleteNoteForever }) {
   const fileInput = useRef(null)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(null) // { done, total }
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+
+  const [deleting, setDeleting] = useState(false)
+  const [deleteProgress, setDeleteProgress] = useState(null) // { done, total }
+  const [deleteResult, setDeleteResult] = useState(null)
+
+  const importedNotes = notes.filter((n) => n.keepId)
+
+  async function handleDeleteAllImported() {
+    if (!importedNotes.length) return
+    const ok = window.confirm(
+      `Delete all ${importedNotes.length} note${importedNotes.length === 1 ? '' : 's'} imported from Keep? This can't be undone.`
+    )
+    if (!ok) return
+
+    setDeleting(true)
+    setDeleteResult(null)
+    setDeleteProgress({ done: 0, total: importedNotes.length })
+
+    let deleted = 0
+    for (const note of importedNotes) {
+      try {
+        await deleteNoteForever(note.id)
+        deleted += 1
+      } catch (err) {
+        console.error('Keep import: failed to delete a note:', err)
+      }
+      setDeleteProgress((p) => ({ ...p, done: p.done + 1 }))
+    }
+
+    setDeleteResult(deleted)
+    setDeleting(false)
+    setDeleteProgress(null)
+  }
 
   async function handleFiles(e) {
     const allFiles = Array.from(e.target.files || [])
@@ -215,6 +248,36 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
           </div>
         )}
       </div>
+
+      {importedNotes.length > 0 && (
+        <div style={rowStyle}>
+          <p style={{ margin: '0 0 10px', color: 'var(--ink-soft)' }}>
+            {importedNotes.length} note{importedNotes.length === 1 ? '' : 's'} in this account came
+            from a Keep import. Deleting them lets you re-import from scratch — useful if you
+            imported before attachments were supported and want the pictures this time.
+          </p>
+          <button
+            className="pill-btn"
+            style={{ color: '#D33' }}
+            disabled={deleting}
+            onClick={handleDeleteAllImported}
+          >
+            {deleting ? 'Deleting…' : `Delete all imported notes (${importedNotes.length})`}
+          </button>
+
+          {deleteProgress && (
+            <p style={{ marginTop: 10, color: 'var(--ink-soft)' }}>
+              Deleting {deleteProgress.done} / {deleteProgress.total}…
+            </p>
+          )}
+
+          {deleteResult !== null && (
+            <p style={{ marginTop: 10, fontSize: 14 }}>
+              ✓ Deleted {deleteResult} note{deleteResult === 1 ? '' : 's'}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

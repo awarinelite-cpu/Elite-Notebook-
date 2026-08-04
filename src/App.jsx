@@ -195,6 +195,7 @@ export default function App() {
             createNote={createNote}
             createLabel={createLabel}
             uploadImage={uploadImage}
+            deleteNoteForever={deleteNoteForever}
           />
         )}
         {!PANEL_VIEWS.includes(view) && (
