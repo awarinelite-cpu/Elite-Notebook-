@@ -108,7 +108,13 @@ export default function KeepImportPanel({ notes, labels, createNote, createLabel
           <IconImport width="16" height="16" />
           {busy ? 'Importing…' : 'Upload Keep export (.zip)'}
         </button>
-        <input ref={fileInput} type="file" accept=".zip" hidden onChange={handleFile} />
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream"
+          hidden
+          onChange={handleFile}
+        />
 
         {progress && (
           <p style={{ marginTop: 10, color: 'var(--ink-soft)' }}>
