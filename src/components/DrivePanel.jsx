@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
 import { listFiles, createFolder, uploadFile, FOLDER_MIME } from '../lib/driveApi.js'
 import { transferItems } from '../lib/driveTransfer.js'
@@ -256,30 +257,39 @@ export default function DrivePanel() {
   }
 
   if (!hasAnyAccount) {
+    const isNative = Capacitor.isNativePlatform()
     return (
       <div className="drive-connect">
         <p>Link your Google Drive to view your files here.</p>
-        <form
-          className="drive-connect-form"
-          onSubmit={(e) => { e.preventDefault(); addAccount(driveEmailHint.trim() || undefined) }}
-        >
-          <input
-            type="email"
-            className="login-input"
-            placeholder="Google account email (optional)"
-            autoComplete="email"
-            value={driveEmailHint}
-            onChange={(e) => setDriveEmailHint(e.target.value)}
-            disabled={connecting}
-          />
-          <button className="drive-connect-btn" type="submit" disabled={connecting}>
+        {isNative ? (
+          <button className="drive-connect-btn" onClick={() => addAccount()} disabled={connecting}>
             {connecting ? 'Connecting…' : 'Connect Google Drive'}
           </button>
-        </form>
-        <p className="drive-connect-hint">
-          Enter the Drive account's email above so Google opens straight to that account's sign-in — it can
-          be different from the email you use to log into this app.
-        </p>
+        ) : (
+          <>
+            <form
+              className="drive-connect-form"
+              onSubmit={(e) => { e.preventDefault(); addAccount(driveEmailHint.trim() || undefined) }}
+            >
+              <input
+                type="email"
+                className="login-input"
+                placeholder="Google account email (optional)"
+                autoComplete="email"
+                value={driveEmailHint}
+                onChange={(e) => setDriveEmailHint(e.target.value)}
+                disabled={connecting}
+              />
+              <button className="drive-connect-btn" type="submit" disabled={connecting}>
+                {connecting ? 'Connecting…' : 'Connect Google Drive'}
+              </button>
+            </form>
+            <p className="drive-connect-hint">
+              Enter the Drive account's email above so Google opens straight to that account's sign-in — it can
+              be different from the email you use to log into this app.
+            </p>
+          </>
+        )}
         {error === 'missing-client-id' && (
           <p className="drive-error">
             Drive isn't set up yet — add a <code>VITE_GOOGLE_CLIENT_ID</code> environment variable (find it in
