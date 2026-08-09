@@ -42,12 +42,14 @@ export function useDriveAuth() {
   }, [])
 
   // Adds a new linked account, forcing Google's account chooser so the
-  // person can pick one that isn't already linked.
-  const addAccount = useCallback(async () => {
+  // person can pick one that isn't already linked. An optional loginHint
+  // pre-fills the email on Google's screen so they only have to type the
+  // password there, instead of hunting for the right account in the list.
+  const addAccount = useCallback(async (loginHint) => {
     setConnecting(true)
     setError(null)
     try {
-      const fresh = await requestDriveToken({ interactive: true, selectAccount: true })
+      const fresh = await requestDriveToken({ interactive: true, selectAccount: true, loginHint: loginHint || undefined })
       upsertAccount(fresh)
       setActiveEmail(fresh.email)
       return fresh

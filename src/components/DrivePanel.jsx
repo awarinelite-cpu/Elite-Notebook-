@@ -101,6 +101,7 @@ export default function DrivePanel() {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(new Map()) // id -> file object
   const [transferMode, setTransferMode] = useState(null) // 'copy' | 'move' | null
+  const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
@@ -258,9 +259,27 @@ export default function DrivePanel() {
     return (
       <div className="drive-connect">
         <p>Link your Google Drive to view your files here.</p>
-        <button className="drive-connect-btn" onClick={() => addAccount()} disabled={connecting}>
-          {connecting ? 'Connecting…' : 'Connect Google Drive'}
-        </button>
+        <form
+          className="drive-connect-form"
+          onSubmit={(e) => { e.preventDefault(); addAccount(driveEmailHint.trim() || undefined) }}
+        >
+          <input
+            type="email"
+            className="login-input"
+            placeholder="Google account email (optional)"
+            autoComplete="email"
+            value={driveEmailHint}
+            onChange={(e) => setDriveEmailHint(e.target.value)}
+            disabled={connecting}
+          />
+          <button className="drive-connect-btn" type="submit" disabled={connecting}>
+            {connecting ? 'Connecting…' : 'Connect Google Drive'}
+          </button>
+        </form>
+        <p className="drive-connect-hint">
+          Enter the Drive account's email above so Google opens straight to that account's sign-in — it can
+          be different from the email you use to log into this app.
+        </p>
         {error === 'missing-client-id' && (
           <p className="drive-error">
             Drive isn't set up yet — add a <code>VITE_GOOGLE_CLIENT_ID</code> environment variable (find it in
