@@ -172,7 +172,14 @@ export function requestDriveToken({ interactive = true, loginHint, selectAccount
           error_callback: (err) => reject(new Error(err?.type || 'popup_failed')),
         })
         client.requestAccessToken({
-          prompt: selectAccount ? 'select_account consent' : interactive ? 'consent' : '',
+          // A specific hint means "go straight to this account" — forcing
+          // select_account on top of that re-shows the full chooser anyway
+          // (Google always renders it when select_account is present,
+          // hint or not), which is what was surfacing every linked account
+          // — and hitting Google's max-signed-in-accounts wall — even when
+          // a single email was typed in. Only fall back to the full
+          // chooser when there's no hint to target.
+          prompt: loginHint ? 'consent' : selectAccount ? 'select_account consent' : interactive ? 'consent' : '',
           hint: loginHint || undefined,
         })
       })
