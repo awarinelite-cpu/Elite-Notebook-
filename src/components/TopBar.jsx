@@ -1,8 +1,8 @@
 import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
-import { IconMenu, IconSearch, IconGrid, IconList, IconSort, IconMoon, IconSun } from './Icons.jsx'
+import { IconMenu, IconSearch, IconGrid, IconList, IconSort, IconMoon, IconSun, IconDrive } from './Icons.jsx'
 
-export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc }) {
+export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc, onDriveClick }) {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const initial = (user?.displayName || user?.email || '?').charAt(0).toUpperCase()
@@ -44,6 +44,13 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
           onClick={() => setSortAsc((v) => !v)}
         >
           <IconSort />
+        </button>
+        <button
+          className="icon-toggle-btn"
+          title="Drive"
+          onClick={onDriveClick}
+        >
+          <IconDrive />
         </button>
         <div className="user-chip">
           {user?.photoURL ? (

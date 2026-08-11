@@ -165,6 +165,7 @@ export default function App() {
         setListView={setListView}
         sortAsc={sortAsc}
         setSortAsc={setSortAsc}
+        onDriveClick={() => setView('drive')}
       />
 
       <div className="content">
