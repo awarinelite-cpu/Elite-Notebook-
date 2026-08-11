@@ -38,7 +38,7 @@ async function asJsonOrThrow(res) {
 export async function listFiles(token, { query, parentId, pageToken } = {}) {
   const clauses = ['trashed = false']
   if (query) clauses.push(`name contains '${query.replace(/'/g, "\\'")}'`)
-  else if (parentId) clauses.push(`'${parentId}' in parents`)
+  else clauses.push(parentId ? `'${parentId}' in parents` : `'root' in parents`)
   const params = new URLSearchParams({
     pageSize: '50',
     fields: LIST_FIELDS,
