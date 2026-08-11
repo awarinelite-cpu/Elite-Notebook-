@@ -443,7 +443,16 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
             onFocus={refreshActiveFormats}
             data-placeholder="Take a note..."
             className="note-editor-textarea note-editor-richtext"
-            style={{ width: '100%', border: 'none', background: 'none', outline: 'none', fontSize: 15, marginTop: 6, fontFamily: 'inherit' }}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'none',
+              outline: 'none',
+              fontSize: 15,
+              marginTop: 6,
+              fontFamily: 'inherit',
+              minHeight: (images.length || audioClips.length || attachments.length) ? 0 : 160,
+            }}
           />
         ) : (
           <div style={{ marginTop: 10 }}>
