@@ -1011,8 +1011,6 @@ a {
 
 .note-editor-attachments {
   flex-shrink: 0;
-  max-height: 40vh;
-  overflow-y: auto;
 }
 
 .note-editor-textarea {
