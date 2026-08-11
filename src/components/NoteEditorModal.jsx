@@ -547,13 +547,13 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
               background: 'none',
               outline: 'none',
               fontSize: 15,
-              marginTop: (images.length || audioClips.length || attachments.length) ? 0 : 6,
+              marginTop: (images.length || audioClips.length || attachments.length) ? 10 : 6,
               fontFamily: 'inherit',
               minHeight: (images.length || audioClips.length || attachments.length) ? 0 : 160,
             }}
           />
         ) : (
-          <div style={{ marginTop: (images.length || audioClips.length || attachments.length) ? 0 : 10 }}>
+          <div style={{ marginTop: 10 }}>
             {checklist.map((item, idx) => (
               <div className="checklist-item" key={item.id}>
                 <input type="checkbox" checked={item.done} onChange={(e) => updateItem(idx, { done: e.target.checked })} />
