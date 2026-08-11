@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconEdit, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
@@ -535,7 +535,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         {(images.length > 0 || audioClips.length > 0 || attachments.length > 0) && (
           <div className="note-editor-attachments">
             {images.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
+              <div className={`note-editor-image-grid grid-${Math.min(images.length, 6)}`}>
                 {images.map((slot, i) => {
                   const pending = isUploading(slot)
                   return (
@@ -544,35 +544,24 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                         src={srcOf(slot)}
                         alt=""
                         style={{
-                          width: 96,
-                          height: 96,
-                          objectFit: 'cover',
-                          borderRadius: 8,
                           cursor: pending ? 'default' : 'pointer',
                           opacity: pending ? 0.6 : 1,
                         }}
                         onClick={() => !pending && setLightboxIndex(i)}
                       />
                       {pending && (
-                        <div className="thumb-spinner" aria-label="Uploading">
-                          <span className="spinner" />
-                        </div>
-                      )}
-                      <button
-                        className="thumb-remove"
-                        title="Remove image"
-                        onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                      >
-                        <IconClose width="12" height="12" />
-                      </button>
-                      {!pending && (
-                        <button
-                          className="thumb-edit"
-                          title="Edit image"
-                          onClick={() => setEditingImage(i)}
-                        >
-                          <IconEdit width="12" height="12" />
-                        </button>
+                        <>
+                          <div className="thumb-spinner" aria-label="Uploading">
+                            <span className="spinner" />
+                          </div>
+                          <button
+                            className="thumb-remove"
+                            title="Cancel upload"
+                            onClick={() => setImages((imgs) => imgs.filter((_, idx) => idx !== i))}
+                          >
+                            <IconClose width="12" height="12" />
+                          </button>
+                        </>
                       )}
                     </div>
                   )
@@ -687,6 +676,14 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onNavigate={setLightboxIndex}
+          onEdit={(i) => {
+            setLightboxIndex(null)
+            setEditingImage(i)
+          }}
+          onDelete={(i) => {
+            setImages((imgs) => imgs.filter((_, idx) => idx !== i))
+            setLightboxIndex(null)
+          }}
         />
       )}
 

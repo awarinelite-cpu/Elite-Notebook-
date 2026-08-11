@@ -1811,24 +1811,53 @@ a {
   font-weight: 600;
 }
 
-/* ---------- Editor thumbnail remove button ---------- */
-.thumb-wrap {
+/* ---------- Note editor image grid (Keep-style, no per-image badges) ---------- */
+.note-editor-image-grid {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.note-editor-image-grid.grid-1 { grid-template-columns: 1fr; }
+.note-editor-image-grid.grid-2 { grid-template-columns: 1fr 1fr; }
+.note-editor-image-grid.grid-3,
+.note-editor-image-grid.grid-4,
+.note-editor-image-grid.grid-5,
+.note-editor-image-grid.grid-6 { grid-template-columns: 1fr 1fr 1fr; }
+
+.note-editor-image-grid .thumb-wrap {
   position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.note-editor-image-grid .thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  margin: 0;
+  border-radius: 0;
+}
+
+.note-editor-image-grid.grid-1 .thumb-wrap {
+  aspect-ratio: 16 / 10;
 }
 
 .thumb-remove {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--ink);
+  background: rgba(0, 0, 0, 0.55);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--surface);
 }
 
 .thumb-spinner {
@@ -1879,10 +1908,17 @@ a {
   border-radius: 4px;
 }
 
-.lightbox-close {
+.lightbox-toolbar {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+}
+
+.lightbox-action {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1925,21 +1961,6 @@ a {
 }
 
 /* ---------- Image editor ---------- */
-.thumb-edit {
-  position: absolute;
-  bottom: -6px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--fab-icon);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--surface);
-}
-
 .editor-backdrop {
   position: fixed;
   inset: 0;

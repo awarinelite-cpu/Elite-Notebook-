@@ -1,6 +1,6 @@
-import { IconClose } from './Icons.jsx'
+import { IconClose, IconEdit, IconTrash } from './Icons.jsx'
 
-export default function ImageLightbox({ images, index, onClose, onNavigate }) {
+export default function ImageLightbox({ images, index, onClose, onNavigate, onEdit, onDelete }) {
   const hasMultiple = images.length > 1
 
   function go(delta) {
@@ -10,9 +10,21 @@ export default function ImageLightbox({ images, index, onClose, onNavigate }) {
 
   return (
     <div className="lightbox-backdrop" onClick={onClose}>
-      <button className="lightbox-close" onClick={onClose} aria-label="Close">
-        <IconClose width="22" height="22" />
-      </button>
+      <div className="lightbox-toolbar" onClick={(e) => e.stopPropagation()}>
+        {onEdit && (
+          <button className="lightbox-action" onClick={() => onEdit(index)} aria-label="Edit image" title="Edit">
+            <IconEdit width="20" height="20" />
+          </button>
+        )}
+        {onDelete && (
+          <button className="lightbox-action" onClick={() => onDelete(index)} aria-label="Delete image" title="Delete">
+            <IconTrash width="20" height="20" />
+          </button>
+        )}
+        <button className="lightbox-action" onClick={onClose} aria-label="Close">
+          <IconClose width="22" height="22" />
+        </button>
+      </div>
 
       {hasMultiple && (
         <button
