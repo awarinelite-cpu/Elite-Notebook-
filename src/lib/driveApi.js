@@ -37,8 +37,11 @@ async function asJsonOrThrow(res) {
 
 export async function listFiles(token, { query, parentId, pageToken } = {}) {
   const clauses = ['trashed = false']
+  // Folder scope always applies, search or not — otherwise a query while
+  // inside a folder (or left over after navigating back to root) silently
+  // searches the whole Drive instead of just the folder being viewed.
+  clauses.push(parentId ? `'${parentId}' in parents` : `'root' in parents`)
   if (query) clauses.push(`name contains '${query.replace(/'/g, "\\'")}'`)
-  else clauses.push(parentId ? `'${parentId}' in parents` : `'root' in parents`)
   const params = new URLSearchParams({
     pageSize: '50',
     fields: LIST_FIELDS,

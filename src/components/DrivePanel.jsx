@@ -167,6 +167,7 @@ export default function DrivePanel() {
 
   function goToCrumb(index) {
     // index -1 means "My Drive" (root)
+    setSearch('')
     setFolderStack((stack) => stack.slice(0, index + 1))
   }
 
