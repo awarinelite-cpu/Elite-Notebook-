@@ -432,119 +432,10 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       </div>
 
       <div className="note-editor-scroll">
-        {!isChecklist ? (
-          <div
-            ref={textEditorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleTextInput}
-            onKeyUp={refreshActiveFormats}
-            onMouseUp={refreshActiveFormats}
-            onFocus={refreshActiveFormats}
-            data-placeholder="Take a note..."
-            className="note-editor-textarea note-editor-richtext"
-            style={{
-              width: '100%',
-              border: 'none',
-              background: 'none',
-              outline: 'none',
-              fontSize: 15,
-              marginTop: 6,
-              fontFamily: 'inherit',
-              minHeight: (images.length || audioClips.length || attachments.length) ? 0 : 160,
-            }}
-          />
-        ) : (
-          <div style={{ marginTop: 10 }}>
-            {checklist.map((item, idx) => (
-              <div className="checklist-item" key={item.id}>
-                <input type="checkbox" checked={item.done} onChange={(e) => updateItem(idx, { done: e.target.checked })} />
-                <input
-                  type="text"
-                  placeholder="List item"
-                  value={item.text}
-                  onChange={(e) => updateItem(idx, { text: e.target.value })}
-                  style={{ border: 'none', background: 'none', outline: 'none', flex: 1, fontSize: 13.5 }}
-                />
-                <button className="icon-btn" onClick={() => removeItem(idx)} title="Remove item">&#10005;</button>
-              </div>
-            ))}
-            <button className="text-btn" onClick={addChecklistItem}>+ Add item</button>
-          </div>
-        )}
-
-        {showReminder && (
-          <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
-            <label style={{ fontSize: 11, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Remind me</label>
-            <br />
-            <input
-              type="datetime-local"
-              value={reminderAt}
-              onChange={(e) => setReminderAt(e.target.value)}
-              style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)' }}
-            />
-            {reminderAt && (
-              <button className="icon-btn" title="Clear reminder" onClick={() => setReminderAt('')} style={{ marginLeft: 6 }}>
-                <IconClose width="14" height="14" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {labels.length > 0 && (
-          <div className="note-labels" style={{ marginTop: 14 }}>
-            {labels.map((l) => (
-              <button
-                key={l.id}
-                className="label-chip"
-                style={{
-                  background: selectedLabels.includes(l.id) ? '#1A73E8' : 'var(--surface-soft)',
-                  color: selectedLabels.includes(l.id) ? '#fff' : 'var(--ink-soft)',
-                  border: 'none',
-                }}
-                onClick={() => toggleLabel(l.id)}
-              >
-                {l.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {showColors && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <div className="color-swatches">
-              {Object.entries(NOTE_COLORS).map(([name, hex]) => (
-                <button
-                  key={name}
-                  className={`swatch ${background === 'none' && color === name ? 'selected' : ''}`}
-                  style={{ background: hex }}
-                  onClick={() => { setColor(name); setBackground('none') }}
-                  aria-label={name}
-                />
-              ))}
-            </div>
-
-            <div className="bg-swatches">
-              {Object.entries(NOTE_BACKGROUNDS).map(([name, css]) => (
-                <button
-                  key={name}
-                  className={`bg-swatch ${background === name ? 'selected' : ''}`}
-                  style={{ background: css }}
-                  onClick={() => setBackground(name)}
-                  aria-label={NOTE_BACKGROUND_LABELS[name]}
-                  title={NOTE_BACKGROUND_LABELS[name]}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-      </div>
-
         {(images.length > 0 || audioClips.length > 0 || attachments.length > 0) && (
-          <div className="note-editor-attachments">
+          <div className="note-editor-attachments" style={{ marginTop: 0 }}>
             {images.length > 0 && (
-              <div className={`note-editor-image-grid grid-${Math.min(images.length, 6)}`}>
+              <div className={`note-editor-image-grid grid-${Math.min(images.length, 6)}`} style={{ margin: 0 }}>
                 {images.map((slot, i) => {
                   const pending = isUploading(slot)
                   return (
@@ -638,6 +529,115 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
             )}
           </div>
         )}
+
+        {!isChecklist ? (
+          <div
+            ref={textEditorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleTextInput}
+            onKeyUp={refreshActiveFormats}
+            onMouseUp={refreshActiveFormats}
+            onFocus={refreshActiveFormats}
+            data-placeholder="Take a note..."
+            className="note-editor-textarea note-editor-richtext"
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'none',
+              outline: 'none',
+              fontSize: 15,
+              marginTop: (images.length || audioClips.length || attachments.length) ? 0 : 6,
+              fontFamily: 'inherit',
+              minHeight: (images.length || audioClips.length || attachments.length) ? 0 : 160,
+            }}
+          />
+        ) : (
+          <div style={{ marginTop: (images.length || audioClips.length || attachments.length) ? 0 : 10 }}>
+            {checklist.map((item, idx) => (
+              <div className="checklist-item" key={item.id}>
+                <input type="checkbox" checked={item.done} onChange={(e) => updateItem(idx, { done: e.target.checked })} />
+                <input
+                  type="text"
+                  placeholder="List item"
+                  value={item.text}
+                  onChange={(e) => updateItem(idx, { text: e.target.value })}
+                  style={{ border: 'none', background: 'none', outline: 'none', flex: 1, fontSize: 13.5 }}
+                />
+                <button className="icon-btn" onClick={() => removeItem(idx)} title="Remove item">&#10005;</button>
+              </div>
+            ))}
+            <button className="text-btn" onClick={addChecklistItem}>+ Add item</button>
+          </div>
+        )}
+
+        {showReminder && (
+          <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+            <label style={{ fontSize: 11, color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>Remind me</label>
+            <br />
+            <input
+              type="datetime-local"
+              value={reminderAt}
+              onChange={(e) => setReminderAt(e.target.value)}
+              style={{ marginTop: 4, padding: 6, borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)' }}
+            />
+            {reminderAt && (
+              <button className="icon-btn" title="Clear reminder" onClick={() => setReminderAt('')} style={{ marginLeft: 6 }}>
+                <IconClose width="14" height="14" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {labels.length > 0 && (
+          <div className="note-labels" style={{ marginTop: 14 }}>
+            {labels.map((l) => (
+              <button
+                key={l.id}
+                className="label-chip"
+                style={{
+                  background: selectedLabels.includes(l.id) ? '#1A73E8' : 'var(--surface-soft)',
+                  color: selectedLabels.includes(l.id) ? '#fff' : 'var(--ink-soft)',
+                  border: 'none',
+                }}
+                onClick={() => toggleLabel(l.id)}
+              >
+                {l.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showColors && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <div className="color-swatches">
+              {Object.entries(NOTE_COLORS).map(([name, hex]) => (
+                <button
+                  key={name}
+                  className={`swatch ${background === 'none' && color === name ? 'selected' : ''}`}
+                  style={{ background: hex }}
+                  onClick={() => { setColor(name); setBackground('none') }}
+                  aria-label={name}
+                />
+              ))}
+            </div>
+
+            <div className="bg-swatches">
+              {Object.entries(NOTE_BACKGROUNDS).map(([name, css]) => (
+                <button
+                  key={name}
+                  className={`bg-swatch ${background === name ? 'selected' : ''}`}
+                  style={{ background: css }}
+                  onClick={() => setBackground(name)}
+                  aria-label={NOTE_BACKGROUND_LABELS[name]}
+                  title={NOTE_BACKGROUND_LABELS[name]}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
 
         <div className="composer-row" style={{ position: 'relative' }}>
           <button className="icon-btn" onClick={() => fileInput.current?.click()} title="Add image" disabled={uploading}>
