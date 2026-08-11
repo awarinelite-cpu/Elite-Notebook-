@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
-import { listFiles, createFolder, uploadFile, FOLDER_MIME } from '../lib/driveApi.js'
+import { listFiles, createFolder, uploadFile, trashFile, FOLDER_MIME } from '../lib/driveApi.js'
 import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
 import DriveFolderPicker from './DriveFolderPicker.jsx'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash } from './Icons.jsx'
 
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
 
@@ -227,6 +227,34 @@ export default function DrivePanel() {
     })
   }
 
+  async function handleDeleteSelected() {
+    const items = Array.from(selected.values())
+    const ok = window.confirm(
+      `Move ${items.length} item${items.length > 1 ? 's' : ''} to Drive trash? You can restore ${items.length > 1 ? 'them' : 'it'} from drive.google.com within 30 days.`
+    )
+    if (!ok) return
+
+    setActionError(null)
+    setActionNotice(`Deleting ${items.length} item${items.length > 1 ? 's' : ''}…`)
+
+    let failed = 0
+    for (const item of items) {
+      try {
+        await trashFile(accessToken, item.id)
+      } catch {
+        failed += 1
+      }
+    }
+
+    clearSelection()
+    refreshCurrentFolder()
+
+    setActionNotice(
+      failed ? `Deleted ${items.length - failed} of ${items.length} — ${failed} failed` : `Deleted ${items.length} item${items.length > 1 ? 's' : ''}`
+    )
+    setTimeout(() => setActionNotice(null), 6000)
+  }
+
   async function handleTransferConfirm({ email: destEmail, folderId, folderName }) {
     const mode = transferMode
     const items = Array.from(selected.values())
@@ -344,6 +372,9 @@ export default function DrivePanel() {
           </button>
           <button className="pill-btn" onClick={() => setTransferMode('move')}>
             <IconMoveTo width="15" height="15" /> Move to…
+          </button>
+          <button className="pill-btn pill-btn-danger" onClick={handleDeleteSelected}>
+            <IconTrash width="15" height="15" /> Delete
           </button>
           <button className="text-btn" style={{ marginLeft: 'auto' }} onClick={clearSelection}>Cancel</button>
         </div>

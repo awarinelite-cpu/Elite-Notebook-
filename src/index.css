@@ -1118,6 +1118,14 @@ a {
   background: var(--border);
 }
 
+.pill-btn-danger {
+  color: #d93025;
+}
+
+.pill-btn-danger:hover {
+  background: #fce8e6;
+}
+
 .text-btn {
   background: none;
   border: none;
