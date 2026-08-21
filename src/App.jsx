@@ -54,6 +54,11 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkSharing, setBulkSharing] = useState(false)
+  // Whichever NoteEditorModal is currently mounted (editingNote or draft —
+  // only one at a time) registers itself here so the hardware back button
+  // can ask it to close an inner layer (lightbox, image editor, etc.)
+  // before falling back to closing the whole note.
+  const noteEditorRef = useRef(null)
   const selectMode = selectedIds.size > 0
 
   useEffect(() => {
@@ -78,8 +83,16 @@ export default function App() {
     CapacitorApp.addListener('backButton', () => {
       const s = backStateRef.current
       if (s.activeTool) { setActiveTool(null); return }
-      if (s.editingNote) { setEditingNote(null); return }
-      if (s.draft) { setDraft(null); return }
+      if (s.editingNote) {
+        if (noteEditorRef.current?.handleBack()) return
+        setEditingNote(null)
+        return
+      }
+      if (s.draft) {
+        if (noteEditorRef.current?.handleBack()) return
+        setDraft(null)
+        return
+      }
       if (s.drawerOpen) { setDrawerOpen(false); return }
       if (s.selectMode) { setSelectedIds(new Set()); return }
       if (s.search) { setSearch(''); return }
@@ -399,6 +412,7 @@ export default function App() {
 
       {editingNote && (
         <NoteEditorModal
+          ref={noteEditorRef}
           key={editingNote.id}
           note={editingNote}
           labels={labels}
@@ -413,6 +427,7 @@ export default function App() {
 
       {draft && (
         <NoteEditorModal
+          ref={noteEditorRef}
           note={null}
           initial={draft}
           labels={labels}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
 import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare } from './Icons.jsx'
@@ -26,7 +26,7 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError, onToast }) {
+const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError, onToast }, ref) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
   const isNew = !note
@@ -56,6 +56,23 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const imgTouchStartPos = useRef({ x: 0, y: 0 })
   const IMG_LONG_PRESS_MS = 450
   const IMG_MOVE_TOLERANCE = 10
+  // Hardware back button support: App.jsx owns the global 'backButton'
+  // listener and, whenever a note is open, asks us first (via this ref)
+  // whether we have an inner layer to close — image editor, drawing/audio
+  // sub-tool, lightbox, image-selection, share menu, more-menu — before it
+  // falls back to closing the whole note. Ordered innermost-first.
+  useImperativeHandle(ref, () => ({
+    handleBack() {
+      if (editingImage !== null) { setEditingImage(null); return true }
+      if (subTool) { setSubTool(null); return true }
+      if (lightboxIndex !== null) { setLightboxIndex(null); return true }
+      if (imageSelectMode) { setImageSelection(new Set()); return true }
+      if (showShareMenu) { setShowShareMenu(false); return true }
+      if (showMoreMenu) { setShowMoreMenu(false); return true }
+      return false
+    },
+  }))
+
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
@@ -986,4 +1003,6 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       )}
     </div>
   )
-}
+})
+
+export default NoteEditorModal
