@@ -67,36 +67,53 @@ export default function App() {
     return () => clearTimeout(t)
   }, [toast])
 
-  // Hardware back button (Android): close whatever's open one layer at a
-  // time — a tool, a note, the drawer, a selection, a search, a non-main
-  // view — and only once none of that is open does it start counting as an
-  // "exit" gesture. Registered once on mount; a ref holds the latest state
-  // so the listener never needs to be torn down and re-added as things
-  // change (avoiding a stale closure without churning the subscription).
+  // Hardware back button: close whatever's open one layer at a time — a
+  // tool, an inner note layer (lightbox/image editor/etc.), a note itself,
+  // the drawer, a selection, a search, a non-main view — and only once none
+  // of that is open does it start counting as an "exit" gesture.
+  //
+  // Two delivery paths are wired to the same logic:
+  //  - Capacitor's native 'backButton' event, for the compiled Android app.
+  //  - A History API / popstate shim, for when this runs as an installed
+  //    PWA (e.g. the Vercel deploy added to the home screen) where there is
+  //    no Capacitor bridge and the hardware back button instead triggers
+  //    ordinary browser back navigation, which would otherwise exit
+  //    immediately since there's no history to go back through.
+  //
+  // A ref holds the latest state so neither listener needs to be torn down
+  // and re-added as things change (avoiding a stale closure without
+  // churning the subscription).
   const backStateRef = useRef()
   backStateRef.current = { activeTool, editingNote, draft, drawerOpen, selectMode, search, view }
   const backPressedOnceRef = useRef(false)
+
+  // Returns true if it closed something, false if we're at the bare main
+  // page and this should count toward the exit gesture instead.
+  function closeTopBackLayer() {
+    const s = backStateRef.current
+    if (s.activeTool) { setActiveTool(null); return true }
+    if (s.editingNote) {
+      if (noteEditorRef.current?.handleBack()) return true
+      setEditingNote(null)
+      return true
+    }
+    if (s.draft) {
+      if (noteEditorRef.current?.handleBack()) return true
+      setDraft(null)
+      return true
+    }
+    if (s.drawerOpen) { setDrawerOpen(false); return true }
+    if (s.selectMode) { setSelectedIds(new Set()); return true }
+    if (s.search) { setSearch(''); return true }
+    if (s.view !== 'notes') { setView('notes'); return true }
+    return false
+  }
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     let handle
     CapacitorApp.addListener('backButton', () => {
-      const s = backStateRef.current
-      if (s.activeTool) { setActiveTool(null); return }
-      if (s.editingNote) {
-        if (noteEditorRef.current?.handleBack()) return
-        setEditingNote(null)
-        return
-      }
-      if (s.draft) {
-        if (noteEditorRef.current?.handleBack()) return
-        setDraft(null)
-        return
-      }
-      if (s.drawerOpen) { setDrawerOpen(false); return }
-      if (s.selectMode) { setSelectedIds(new Set()); return }
-      if (s.search) { setSearch(''); return }
-      if (s.view !== 'notes') { setView('notes'); return }
+      if (closeTopBackLayer()) return
 
       // Truly on the bare main page: require a second press within 2s to
       // actually exit, so one stray back-tap doesn't quit the app.
@@ -109,6 +126,39 @@ export default function App() {
       }
     }).then((h) => { handle = h })
     return () => { handle?.remove() }
+  }, [])
+
+  // PWA / plain-browser path. We keep one extra "guard" history entry
+  // pushed at all times; the hardware/gesture back button pops it and
+  // fires 'popstate' instead of leaving the page. If that closed a UI
+  // layer, we push the guard straight back so the next press is caught
+  // too. If we were already on the bare main page, we let the pop stand
+  // (and show the "press again" toast) so a genuine second press within
+  // 2s has nothing left to intercept and the PWA actually exits — same
+  // double-press-to-exit feel as the native path, without an artificial
+  // native-only API.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return
+    const GUARD = { eliteBackGuard: true }
+    window.history.pushState(GUARD, '')
+    function onPopState() {
+      if (closeTopBackLayer()) {
+        window.history.pushState(GUARD, '')
+        return
+      }
+      if (!backPressedOnceRef.current) {
+        backPressedOnceRef.current = true
+        setToast('Press back again to exit')
+        setTimeout(() => {
+          backPressedOnceRef.current = false
+          window.history.pushState(GUARD, '')
+        }, 2000)
+      }
+      // else: no guard re-pushed — the next back press proceeds past this
+      // page for real, which is what actually exits/minimizes the PWA.
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   // Leaving the current view (e.g. via the drawer) exits selection mode so
