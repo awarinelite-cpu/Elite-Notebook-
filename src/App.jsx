@@ -130,37 +130,54 @@ export default function App() {
     return () => { handle?.remove() }
   }, [])
 
-  // PWA / plain-browser path. We keep one extra "guard" history entry
-  // pushed at all times; the hardware/gesture back button pops it and
-  // fires 'popstate' instead of leaving the page. If that closed a UI
-  // layer, we push the guard straight back so the next press is caught
-  // too. If we were already on the bare main page, we let the pop stand
-  // (and show the "press again" toast) so a genuine second press within
-  // 2s has nothing left to intercept and the PWA actually exits — same
-  // double-press-to-exit feel as the native path, without an artificial
-  // native-only API.
+  // PWA / plain-browser path. Modern Chrome's back-button-hijacking
+  // mitigations often skip a history entry that a page pushes reactively
+  // from inside a 'popstate' handler (the classic "push right back after
+  // every pop" trick) — it can work once and then get silently ignored,
+  // which let real back-navigation (and app exit) slip through here.
+  // Instead we pre-load a batch of guard entries up front — a genuine
+  // forward action, not a reaction to back — and top the batch back up
+  // on a timer rather than synchronously inside the popstate handler.
+  const GUARD_BATCH = 30
+  const guardRemainingRef = useRef(0)
+  function pushGuards(n) {
+    for (let i = 0; i < n; i++) window.history.pushState({ eliteBackGuard: true }, '')
+    guardRemainingRef.current += n
+  }
+
   useEffect(() => {
     if (Capacitor.isNativePlatform()) return
-    const GUARD = { eliteBackGuard: true }
-    window.history.pushState(GUARD, '')
+    pushGuards(GUARD_BATCH)
+
     function onPopState() {
-      if (closeTopBackLayer()) {
-        window.history.pushState(GUARD, '')
-        return
-      }
-      if (!backPressedOnceRef.current) {
+      guardRemainingRef.current = Math.max(0, guardRemainingRef.current - 1)
+      if (closeTopBackLayer()) return
+
+      // Truly on the bare main page: require a second press within 2s to
+      // actually exit, so one stray back-tap doesn't quit the app.
+      if (backPressedOnceRef.current) {
+        // Jump past every remaining guard entry in one go so the PWA
+        // actually exits now instead of quietly eating more presses.
+        window.history.go(-(guardRemainingRef.current + 1))
+      } else {
         backPressedOnceRef.current = true
         setToast('Press back again to exit')
-        setTimeout(() => {
-          backPressedOnceRef.current = false
-          window.history.pushState(GUARD, '')
-        }, 2000)
+        setTimeout(() => { backPressedOnceRef.current = false }, 2000)
       }
-      // else: no guard re-pushed — the next back press proceeds past this
-      // page for real, which is what actually exits/minimizes the PWA.
     }
     window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
+
+    // Out-of-band top-up, deliberately not triggered from inside the
+    // popstate handler — keeps the guard supply healthy without relying
+    // on a pattern Chrome may choose to ignore.
+    const topUp = setInterval(() => {
+      if (guardRemainingRef.current < 5) pushGuards(GUARD_BATCH)
+    }, 1000)
+
+    return () => {
+      window.removeEventListener('popstate', onPopState)
+      clearInterval(topUp)
+    }
   }, [])
 
   // Leaving the current view (e.g. via the drawer) exits selection mode so
