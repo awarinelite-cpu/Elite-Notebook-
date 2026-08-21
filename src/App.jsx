@@ -369,6 +369,7 @@ export default function App() {
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
           onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+          onToast={(msg) => setToast(msg)}
         />
       )}
 
@@ -383,6 +384,7 @@ export default function App() {
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
           onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+          onToast={(msg) => setToast(msg)}
         />
       )}
     </div>

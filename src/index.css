@@ -1901,6 +1901,12 @@ a {
   object-fit: contain;
 }
 
+.share-options-menu {
+  top: calc(100% + 6px);
+  bottom: auto;
+  right: 0;
+}
+
 .thumb-wrap.thumb-selected {
   box-shadow: 0 0 0 3px #1A73E8 inset;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import jsPDF from 'jspdf'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
 import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
@@ -25,7 +26,7 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError }) {
+export default function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError, onToast }) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
   const isNew = !note
@@ -49,6 +50,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [imageSelection, setImageSelection] = useState(() => new Set())
   const imageSelectMode = imageSelection.size > 0
   const [sharingImages, setSharingImages] = useState(false)
+  const [showShareMenu, setShowShareMenu] = useState(false)
   const imgLongPressTimer = useRef(null)
   const imgLongPressFired = useRef(null) // index the long press fired for, or null
   const imgTouchStartPos = useRef({ x: 0, y: 0 })
@@ -414,42 +416,128 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   function deleteSelectedImages() {
     setImages((imgs) => imgs.filter((_, idx) => !imageSelection.has(idx)))
     setImageSelection(new Set())
+    setShowShareMenu(false)
   }
 
-  async function shareSelectedImages() {
+  function selectedImageUrls() {
+    return images.filter((slot, i) => imageSelection.has(i) && typeof slot === 'string')
+  }
+
+  // Fetches each selected image's bytes and returns File objects. Firebase
+  // Storage URLs load fine in <img> tags but plain fetch() can be blocked by
+  // the bucket's CORS config, so each fetch fails independently — a caller
+  // gets back only the images that actually came through, plus a count of
+  // how many didn't, rather than one failure silently killing everything.
+  async function fetchImagesAsFiles(urls) {
+    const results = await Promise.all(
+      urls.map(async (url, i) => {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) throw new Error('bad response')
+          const blob = await res.blob()
+          return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
+        } catch {
+          return null
+        }
+      })
+    )
+    return { files: results.filter(Boolean), failed: results.filter((r) => !r).length }
+  }
+
+  async function shareAsPictures() {
     if (sharingImages) return
     setSharingImages(true)
-    const urls = images
-      .filter((slot, i) => imageSelection.has(i) && typeof slot === 'string')
-      .map((slot) => slot)
+    setShowShareMenu(false)
+    const urls = selectedImageUrls()
     try {
-      let files = []
-      if (navigator.canShare && urls.length) {
-        try {
-          files = await Promise.all(
-            urls.map(async (url, i) => {
-              const res = await fetch(url)
-              const blob = await res.blob()
-              return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
-            })
-          )
-        } catch {
-          files = []
-        }
+      const { files, failed } = await fetchImagesAsFiles(urls)
+      if (!files.length) {
+        onToast?.("Couldn't attach those pictures to share — the storage bucket may be blocking direct downloads. Try Share as link instead.")
+        return
       }
-      if (navigator.share) {
-        if (files.length && navigator.canShare?.({ files })) {
-          await navigator.share({ files, title: title || 'Images' })
-        } else {
-          await navigator.share({ text: urls.join('\n'), title: title || 'Images' })
-        }
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(urls.join('\n'))
+      if (navigator.share && navigator.canShare?.({ files })) {
+        await navigator.share({ files, title: title || 'Images' })
+        if (failed) onToast?.(`Shared ${files.length} of ${urls.length} pictures — the rest couldn't be downloaded.`)
+      } else {
+        onToast?.("This device can't share picture files directly.")
       }
     } catch (err) {
-      if (err?.name !== 'AbortError') console.error('share failed:', err)
+      if (err?.name !== 'AbortError') { console.error('share failed:', err); onToast?.('Sharing pictures failed.') }
     } finally {
       setSharingImages(false)
+    }
+  }
+
+  async function shareAsPDF() {
+    if (sharingImages) return
+    setSharingImages(true)
+    setShowShareMenu(false)
+    const urls = selectedImageUrls()
+    try {
+      const { files, failed } = await fetchImagesAsFiles(urls)
+      if (!files.length) {
+        onToast?.("Couldn't load those pictures to build a PDF — the storage bucket may be blocking direct downloads. Try Share as link instead.")
+        return
+      }
+
+      const doc = new jsPDF({ unit: 'pt' })
+      for (let i = 0; i < files.length; i++) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = reject
+          reader.readAsDataURL(files[i])
+        })
+        const dims = await new Promise((resolve, reject) => {
+          const probe = new Image()
+          probe.onload = () => resolve({ w: probe.width, h: probe.height })
+          probe.onerror = reject
+          probe.src = dataUrl
+        })
+        const pageW = doc.internal.pageSize.getWidth()
+        const pageH = doc.internal.pageSize.getHeight()
+        const scale = Math.min(pageW / dims.w, pageH / dims.h)
+        const w = dims.w * scale
+        const h = dims.h * scale
+        if (i > 0) doc.addPage()
+        doc.addImage(dataUrl, 'JPEG', (pageW - w) / 2, (pageH - h) / 2, w, h)
+      }
+
+      const pdfBlob = doc.output('blob')
+      const pdfFile = new File([pdfBlob], `${title || 'images'}.pdf`, { type: 'application/pdf' })
+
+      if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
+        await navigator.share({ files: [pdfFile], title: title || 'Images' })
+        if (failed) onToast?.(`Built the PDF from ${files.length} of ${urls.length} pictures — the rest couldn't be downloaded.`)
+      } else {
+        // No file-sharing support: fall back to downloading the PDF locally.
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(pdfBlob)
+        link.download = pdfFile.name
+        link.click()
+        URL.revokeObjectURL(link.href)
+        onToast?.('PDF downloaded — this device can\u2019t share files directly.')
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') { console.error('PDF share failed:', err); onToast?.("Couldn't build the PDF.") }
+    } finally {
+      setSharingImages(false)
+    }
+  }
+
+  async function shareAsLink() {
+    setShowShareMenu(false)
+    const urls = selectedImageUrls()
+    if (!urls.length) return
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: urls.join('\n'), title: title || 'Images' })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(urls.join('\n'))
+        onToast?.('Copied link(s) to clipboard')
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') console.error('link share failed:', err)
     }
   }
 
@@ -468,7 +556,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
         <div className="note-editor-topbar">
           {imageSelectMode ? (
             <>
-              <button className="icon-btn" onClick={() => setImageSelection(new Set())} title="Cancel selection">
+              <button className="icon-btn" onClick={() => { setImageSelection(new Set()); setShowShareMenu(false) }} title="Cancel selection">
                 <IconClose width="20" height="20" />
               </button>
               <span className="selection-bar-count" style={{ marginLeft: 2 }}>{imageSelection.size} selected</span>
@@ -476,9 +564,24 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                 {imageSelection.size === images.length ? 'Clear all' : 'Select all'}
               </button>
               <div style={{ flex: 1 }} />
-              <button className="icon-btn" onClick={shareSelectedImages} disabled={sharingImages} title="Share selected">
-                <IconShare width="18" height="18" />
-              </button>
+              <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                <button className="icon-btn" onClick={() => setShowShareMenu((v) => !v)} disabled={sharingImages} title="Share selected">
+                  <IconShare width="18" height="18" />
+                </button>
+                {showShareMenu && (
+                  <div className="more-menu share-options-menu">
+                    <button className="more-menu-item" onClick={shareAsPictures}>
+                      <IconImage width="16" height="16" /> Share as pictures
+                    </button>
+                    <button className="more-menu-item" onClick={shareAsPDF}>
+                      <IconFileDoc width="16" height="16" /> Share as PDF
+                    </button>
+                    <button className="more-menu-item" onClick={shareAsLink}>
+                      <IconAttachment width="16" height="16" /> Share as link
+                    </button>
+                  </div>
+                )}
+              </div>
               <button className="icon-btn" onClick={deleteSelectedImages} title="Delete selected">
                 <IconTrash width="19" height="19" />
               </button>
