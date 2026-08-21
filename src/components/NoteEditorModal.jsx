@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
@@ -48,6 +48,7 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   // grid's long-press-to-select pattern, one level down at the image level).
   const [imageSelection, setImageSelection] = useState(() => new Set())
   const imageSelectMode = imageSelection.size > 0
+  const [sharingImages, setSharingImages] = useState(false)
   const imgLongPressTimer = useRef(null)
   const imgLongPressFired = useRef(null) // index the long press fired for, or null
   const imgTouchStartPos = useRef({ x: 0, y: 0 })
@@ -415,6 +416,43 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     setImageSelection(new Set())
   }
 
+  async function shareSelectedImages() {
+    if (sharingImages) return
+    setSharingImages(true)
+    const urls = images
+      .filter((slot, i) => imageSelection.has(i) && typeof slot === 'string')
+      .map((slot) => slot)
+    try {
+      let files = []
+      if (navigator.canShare && urls.length) {
+        try {
+          files = await Promise.all(
+            urls.map(async (url, i) => {
+              const res = await fetch(url)
+              const blob = await res.blob()
+              return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
+            })
+          )
+        } catch {
+          files = []
+        }
+      }
+      if (navigator.share) {
+        if (files.length && navigator.canShare?.({ files })) {
+          await navigator.share({ files, title: title || 'Images' })
+        } else {
+          await navigator.share({ text: urls.join('\n'), title: title || 'Images' })
+        }
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(urls.join('\n'))
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') console.error('share failed:', err)
+    } finally {
+      setSharingImages(false)
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={handleClose}>
       <div
@@ -438,6 +476,9 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                 {imageSelection.size === images.length ? 'Clear all' : 'Select all'}
               </button>
               <div style={{ flex: 1 }} />
+              <button className="icon-btn" onClick={shareSelectedImages} disabled={sharingImages} title="Share selected">
+                <IconShare width="18" height="18" />
+              </button>
               <button className="icon-btn" onClick={deleteSelectedImages} title="Delete selected">
                 <IconTrash width="19" height="19" />
               </button>
