@@ -21,13 +21,28 @@ function formatModified(iso) {
 // Google's own embeddable preview URLs. These are explicitly designed by
 // Google to be shown in an iframe (unlike a normal drive.google.com link,
 // which refuses to be framed), so files open right inside the app.
+//
+// Two different Google products live behind these URLs, and they behave
+// very differently at small widths:
+//  - docs.google.com/.../preview (native Google Docs/Sheets/Slides) is an
+//    embed of the actual editor UI: a fixed-width desktop canvas (~980px)
+//    that is NOT responsive on its own. It needs to be rendered at that
+//    native width and scaled down to fit, or text runs off the right edge.
+//  - drive.google.com/file/d/.../preview (everything else — uploaded
+//    .docx/.pdf/images, i.e. every non-native file, which is most of what
+//    people keep on Drive) is Google's universal file previewer, which IS
+//    responsive to whatever width its iframe is actually given. Forcing
+//    that one into the same fixed 980px canvas-then-shrink trick was the
+//    bug: at 980px the previewer was already clipping page margins before
+//    our CSS ever got a chance to scale it down, so shrinking afterwards
+//    just shrank the already-cropped result.
 function previewUrl(file) {
   const { id, mimeType } = file
-  if (mimeType === 'application/vnd.google-apps.document') return `https://docs.google.com/document/d/${id}/preview`
-  if (mimeType === 'application/vnd.google-apps.spreadsheet') return `https://docs.google.com/spreadsheets/d/${id}/preview`
-  if (mimeType === 'application/vnd.google-apps.presentation') return `https://docs.google.com/presentation/d/${id}/preview`
+  if (mimeType === 'application/vnd.google-apps.document') return { url: `https://docs.google.com/document/d/${id}/preview`, fixedWidth: true }
+  if (mimeType === 'application/vnd.google-apps.spreadsheet') return { url: `https://docs.google.com/spreadsheets/d/${id}/preview`, fixedWidth: true }
+  if (mimeType === 'application/vnd.google-apps.presentation') return { url: `https://docs.google.com/presentation/d/${id}/preview`, fixedWidth: true }
   if (mimeType === FOLDER_MIME) return null
-  return `https://drive.google.com/file/d/${id}/preview`
+  return { url: `https://drive.google.com/file/d/${id}/preview`, fixedWidth: false }
 }
 
 function formatSize(bytes) {
@@ -38,13 +53,13 @@ function formatSize(bytes) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Google's Docs/Sheets/Slides/file preview iframes render at a fixed
-// desktop width (~980px) and are not mobile-responsive on their own, which
-// is what causes text to run off the right edge on a phone screen. This
-// renders the iframe at that native width, then scales the whole thing
-// down with a CSS transform to exactly match the available space, so the
-// full page is visible with nothing cropped — the iframe still scrolls
-// internally for content taller than one screen.
+// For native Google Docs/Sheets/Slides embeds only: those render at a
+// fixed desktop canvas width (~980px) and are not responsive on their own,
+// which is what causes text to run off the right edge on a phone screen.
+// This renders the iframe at that native width, then scales the whole
+// thing down with a CSS transform to exactly match the available space,
+// so the full page is visible with nothing cropped — the iframe still
+// scrolls internally for content taller than one screen.
 function ScaledPreviewFrame({ src, title }) {
   const wrapRef = useRef(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -76,6 +91,24 @@ function ScaledPreviewFrame({ src, title }) {
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
         }}
+      />
+    </div>
+  )
+}
+
+// For every other file (uploaded .docx/.pdf/images, etc.) — Google's
+// universal file previewer, which is genuinely responsive to whatever
+// width/height its iframe is given. No canvas trick needed or wanted:
+// giving it the real full-screen dimensions is what lets it lay the page
+// out (and its margins) correctly in the first place.
+function ResponsivePreviewFrame({ src, title }) {
+  return (
+    <div className="drive-preview-frame-wrap">
+      <iframe
+        src={src}
+        title={title}
+        allow="autoplay"
+        style={{ width: '100%', height: '100%', border: 'none' }}
       />
     </div>
   )
@@ -176,8 +209,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       setFolderStack((stack) => [...stack, { id: f.id, name: f.name }])
       return
     }
-    const url = previewUrl(f)
-    if (url) setPreviewing({ url, name: f.name })
+    const preview = previewUrl(f)
+    if (preview) setPreviewing({ url: preview.url, name: f.name, fixedWidth: preview.fixedWidth })
     else window.open(f.webViewLink, '_blank', 'noopener')
   }
 
@@ -567,7 +600,9 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
             </button>
             <span className="drive-preview-title">{previewing.name}</span>
           </div>
-          <ScaledPreviewFrame src={previewing.url} title={previewing.name} />
+          {previewing.fixedWidth
+            ? <ScaledPreviewFrame src={previewing.url} title={previewing.name} />
+            : <ResponsivePreviewFrame src={previewing.url} title={previewing.name} />}
         </div>
       )}
 
