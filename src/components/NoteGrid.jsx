@@ -1,7 +1,7 @@
 import NoteCard from './NoteCard.jsx'
 import EmptyState from './EmptyState.jsx'
 
-export default function NoteGrid({ notes, labels, view, listView, ...actions }) {
+export default function NoteGrid({ notes, labels, view, listView, selectMode, selectedIds, onToggleSelect, onLongPressSelect, ...actions }) {
   if (notes.length === 0) {
     return <EmptyState view={view} />
   }
@@ -19,7 +19,17 @@ export default function NoteGrid({ notes, labels, view, listView, ...actions }) 
           <div className="section-label">Pinned</div>
           <div className={gridClass} style={{ marginBottom: 24 }}>
             {pinned.map((note) => (
-              <NoteCard key={note.id} note={note} labels={labels} view={view} {...actions} />
+              <NoteCard
+                key={note.id}
+                note={note}
+                labels={labels}
+                view={view}
+                selectMode={selectMode}
+                selected={selectedIds?.has(note.id)}
+                onToggleSelect={onToggleSelect}
+                onLongPressSelect={onLongPressSelect}
+                {...actions}
+              />
             ))}
           </div>
         </>
@@ -29,7 +39,17 @@ export default function NoteGrid({ notes, labels, view, listView, ...actions }) 
 
       <div className={gridClass}>
         {others.map((note) => (
-          <NoteCard key={note.id} note={note} labels={labels} view={view} {...actions} />
+          <NoteCard
+            key={note.id}
+            note={note}
+            labels={labels}
+            view={view}
+            selectMode={selectMode}
+            selected={selectedIds?.has(note.id)}
+            onToggleSelect={onToggleSelect}
+            onLongPressSelect={onLongPressSelect}
+            {...actions}
+          />
         ))}
       </div>
     </div>

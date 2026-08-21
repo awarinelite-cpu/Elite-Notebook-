@@ -9,6 +9,7 @@ import Login from './components/Login.jsx'
 import SecurityLock from './components/SecurityLock.jsx'
 import Drawer from './components/Drawer.jsx'
 import TopBar from './components/TopBar.jsx'
+import SelectionBar from './components/SelectionBar.jsx'
 import NoteGrid from './components/NoteGrid.jsx'
 import NoteEditorModal from './components/NoteEditorModal.jsx'
 import LabelManager from './components/LabelManager.jsx'
@@ -49,12 +50,21 @@ export default function App() {
   const [draft, setDraft] = useState(null) // { initial } when creating, or null
   const [activeTool, setActiveTool] = useState(null) // 'drawing' | 'audio' | null
   const [toast, setToast] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkSharing, setBulkSharing] = useState(false)
+  const selectMode = selectedIds.size > 0
 
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 5000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // Leaving the current view (e.g. via the drawer) exits selection mode so
+  // stale selections don't linger against a different list of notes.
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [view])
 
   // Someone shared a file/link/text to the installed app from the OS share
   // sheet. The service worker stashed it in IndexedDB and redirected here
@@ -125,6 +135,106 @@ export default function App() {
     updateNote(note.id, { checklist: next })
   }
 
+  // --- Multi-select (long press on a note enters this) ---
+  function enterSelectMode(note) {
+    setSelectedIds(new Set([note.id]))
+  }
+  function toggleSelect(note) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(note.id)) next.delete(note.id)
+      else next.add(note.id)
+      return next
+    })
+  }
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+  function selectAllOrNone() {
+    setSelectedIds((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((n) => n.id))
+    )
+  }
+
+  const selectedNotes = filtered.filter((n) => selectedIds.has(n.id))
+  const allSelectedPinned = selectedNotes.length > 0 && selectedNotes.every((n) => n.pinned)
+
+  function bulkTogglePin() {
+    const next = !allSelectedPinned
+    selectedNotes.forEach((n) => updateNote(n.id, { pinned: next }))
+    clearSelection()
+  }
+  function bulkArchive() {
+    selectedNotes.forEach((n) => updateNote(n.id, { archived: !n.archived }))
+    clearSelection()
+  }
+  function bulkTrash() {
+    selectedNotes.forEach((n) => updateNote(n.id, { trashed: true, archived: false }))
+    clearSelection()
+  }
+  function bulkRestore() {
+    selectedNotes.forEach((n) => updateNote(n.id, { trashed: false }))
+    clearSelection()
+  }
+  function bulkDeleteForever() {
+    if (!window.confirm(`Delete ${selectedNotes.length} note${selectedNotes.length === 1 ? '' : 's'} forever? This can't be undone.`)) return
+    selectedNotes.forEach((n) => deleteNoteForever(n.id))
+    clearSelection()
+  }
+  async function bulkShare() {
+    if (bulkSharing || selectedNotes.length === 0) return
+    setBulkSharing(true)
+    try {
+      const shareText = selectedNotes
+        .map((n) => {
+          const parts = []
+          if (n.title) parts.push(n.title)
+          if (n.text) parts.push(stripHtml(n.text))
+          if (n.checklist?.length) {
+            parts.push(n.checklist.map((c) => `${c.done ? '\u2611' : '\u2610'} ${c.text}`).join('\n'))
+          }
+          return parts.join('\n')
+        })
+        .filter(Boolean)
+        .join('\n\n---\n\n')
+
+      // Gather up to 5 images total across the selected notes so the share
+      // sheet can attach real files, not just link text.
+      const allImageUrls = selectedNotes.flatMap((n) => n.images || []).slice(0, 5)
+      let files = []
+      if (navigator.canShare && allImageUrls.length) {
+        try {
+          files = await Promise.all(
+            allImageUrls.map(async (url, i) => {
+              const res = await fetch(url)
+              const blob = await res.blob()
+              return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
+            })
+          )
+        } catch {
+          files = []
+        }
+      }
+
+      const shareTitle = selectedNotes.length === 1 ? (selectedNotes[0].title || 'Note') : `${selectedNotes.length} notes`
+
+      if (navigator.share) {
+        if (files.length && navigator.canShare?.({ files })) {
+          await navigator.share({ title: shareTitle, text: shareText, files })
+        } else {
+          await navigator.share({ title: shareTitle, text: shareText })
+        }
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText || shareTitle)
+        setToast('Copied to clipboard')
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') console.error('bulk share failed:', err)
+    } finally {
+      setBulkSharing(false)
+    }
+  }
+
   function handleFabSelect(type) {
     if (type === 'text') setDraft({})
     else if (type === 'list') setDraft({ checklist: [{ id: crypto.randomUUID(), text: '', done: false }] })
@@ -157,16 +267,34 @@ export default function App() {
     <div className="app-shell">
       <Drawer open={drawerOpen} view={view} setView={setView} onClose={() => setDrawerOpen(false)} />
 
-      <TopBar
-        search={search}
-        setSearch={setSearch}
-        onMenuClick={() => setDrawerOpen(true)}
-        listView={listView}
-        setListView={setListView}
-        sortAsc={sortAsc}
-        setSortAsc={setSortAsc}
-        onDriveClick={() => setView('drive')}
-      />
+      {selectMode ? (
+        <SelectionBar
+          count={selectedIds.size}
+          allSelected={selectedIds.size === filtered.length && filtered.length > 0}
+          allPinned={allSelectedPinned}
+          view={view}
+          sharing={bulkSharing}
+          onCancel={clearSelection}
+          onSelectAll={selectAllOrNone}
+          onShare={bulkShare}
+          onTogglePin={bulkTogglePin}
+          onArchive={bulkArchive}
+          onTrash={bulkTrash}
+          onRestore={bulkRestore}
+          onDeleteForever={bulkDeleteForever}
+        />
+      ) : (
+        <TopBar
+          search={search}
+          setSearch={setSearch}
+          onMenuClick={() => setDrawerOpen(true)}
+          listView={listView}
+          setListView={setListView}
+          sortAsc={sortAsc}
+          setSortAsc={setSortAsc}
+          onDriveClick={() => setView('drive')}
+        />
+      )}
 
       <div className="content">
         {!install.standalone && install.canPromptInstall && !installBannerDismissed && (
@@ -212,11 +340,15 @@ export default function App() {
             onRestore={restore}
             onDeleteForever={deleteNoteForever}
             onToggleChecklistItem={toggleChecklistItem}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onLongPressSelect={enterSelectMode}
           />
         )}
       </div>
 
-      {view === 'notes' && <Fab onSelect={handleFabSelect} onPickImage={handlePickImage} />}
+      {view === 'notes' && !selectMode && <Fab onSelect={handleFabSelect} onPickImage={handlePickImage} />}
 
       {activeTool === 'drawing' && (
         <DrawingCanvas onCancel={() => setActiveTool(null)} onSave={handleDrawingSave} />

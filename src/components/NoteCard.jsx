@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
-import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare } from './Icons.jsx'
+import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare, IconCheck } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
@@ -10,7 +10,22 @@ function formatReminder(ts) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive, onTrash, onRestore, onDeleteForever, onToggleChecklistItem, view }) {
+export default function NoteCard({
+  note,
+  labels,
+  onEdit,
+  onTogglePin,
+  onArchive,
+  onTrash,
+  onRestore,
+  onDeleteForever,
+  onToggleChecklistItem,
+  view,
+  selectMode,
+  selected,
+  onToggleSelect,
+  onLongPressSelect,
+}) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
   const overdue = note.reminderAt && new Date(note.reminderAt) < new Date()
@@ -19,7 +34,6 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [sharing, setSharing] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [actionsVisible, setActionsVisible] = useState(false)
   const cardRef = useRef(null)
   const longPressTimer = useRef(null)
   const longPressFired = useRef(false)
@@ -42,9 +56,13 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
     const touch = e.touches?.[0]
     if (touch) touchStartPos.current = { x: touch.clientX, y: touch.clientY }
     clearLongPressTimer()
+    // Long press enters (or extends) multi-select mode for this note.
+    // Once already selecting, a plain tap toggles notes in and out, so
+    // long press doesn't need to do anything further at that point.
+    if (selectMode) return
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true
-      setActionsVisible(true)
+      onLongPressSelect(note)
       if (navigator.vibrate) navigator.vibrate(10)
     }, LONG_PRESS_MS)
   }
@@ -66,30 +84,18 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
   }
 
   function handleCardClick() {
-    // A long press already revealed the action icons: swallow this tap
-    // instead of also opening the editor, and don't reopen the note.
+    // A long press already put us into selection mode: swallow this tap
+    // instead of also opening the editor.
     if (longPressFired.current) {
       longPressFired.current = false
       return
     }
-    if (actionsVisible) {
-      setActionsVisible(false)
+    if (selectMode) {
+      onToggleSelect(note)
       return
     }
     onEdit(note)
   }
-
-  // Dismiss the action icons when the person taps/clicks anywhere outside this card.
-  useEffect(() => {
-    if (!actionsVisible) return
-    function handleOutside(e) {
-      if (cardRef.current && !cardRef.current.contains(e.target)) {
-        setActionsVisible(false)
-      }
-    }
-    document.addEventListener('pointerdown', handleOutside)
-    return () => document.removeEventListener('pointerdown', handleOutside)
-  }, [actionsVisible])
 
   async function handleShare(e) {
     e.stopPropagation()
@@ -145,11 +151,27 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
     }
   }
 
+  function handleMouseDown(e) {
+    // Ignore mouse-down on interactive children (checkboxes, links, etc.)
+    // and skip entirely once already in selection mode, same as touch.
+    if (selectMode || e.button !== 0) return
+    longPressFired.current = false
+    clearLongPressTimer()
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      onLongPressSelect(note)
+    }, LONG_PRESS_MS)
+  }
+
+  function handleMouseUpOrLeave() {
+    clearLongPressTimer()
+  }
+
   return (
     <>
     <div
       ref={cardRef}
-      className="note-card"
+      className={`note-card ${selected ? 'note-card-selected' : ''}`}
       style={{
         background:
           note.background && note.background !== 'none'
@@ -161,8 +183,20 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUpOrLeave}
+      onMouseLeave={handleMouseUpOrLeave}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {selectMode && (
+        <div
+          className={`drive-select-check drive-select-check-card ${selected ? 'checked' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(note) }}
+        >
+          {selected && <IconCheck width="13" height="13" />}
+        </div>
+      )}
+
       {note.reminderAt && (
         <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
           <IconBell width="12" height="12" /> {formatReminder(note.reminderAt)}
@@ -246,38 +280,40 @@ export default function NoteCard({ note, labels, onEdit, onTogglePin, onArchive,
         </div>
       )}
 
-      <div
-        className={`note-actions ${actionsVisible ? 'visible' : ''}`}
-        onClick={(e) => e.stopPropagation()}
-        style={{ position: 'relative' }}
-      >
-        <button className="icon-btn" title="Share" onClick={handleShare} disabled={sharing}>
-          <IconShare width="18" height="18" />
-        </button>
-        {copied && <span className="share-copied-tip">Copied to clipboard</span>}
-        {view !== 'trash' ? (
-          <>
-            <button className="icon-btn" title={note.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePin(note)}>
-              {note.pinned ? <IconUnpin /> : <IconPin />}
-            </button>
-            <button className="icon-btn" title={note.archived ? 'Unarchive' : 'Archive'} onClick={() => onArchive(note)}>
-              <IconArchive width="18" height="18" />
-            </button>
-            <button className="icon-btn" title="Move to trash" onClick={() => onTrash(note)}>
-              <IconTrash width="18" height="18" />
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="icon-btn" title="Restore" onClick={() => onRestore(note)}>
-              <IconRestore />
-            </button>
-            <button className="icon-btn" title="Delete forever" onClick={() => onDeleteForever(note.id)}>
-              <IconClose width="18" height="18" />
-            </button>
-          </>
-        )}
-      </div>
+      {!selectMode && (
+        <div
+          className="note-actions"
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'relative' }}
+        >
+          <button className="icon-btn" title="Share" onClick={handleShare} disabled={sharing}>
+            <IconShare width="18" height="18" />
+          </button>
+          {copied && <span className="share-copied-tip">Copied to clipboard</span>}
+          {view !== 'trash' ? (
+            <>
+              <button className="icon-btn" title={note.pinned ? 'Unpin' : 'Pin'} onClick={() => onTogglePin(note)}>
+                {note.pinned ? <IconUnpin /> : <IconPin />}
+              </button>
+              <button className="icon-btn" title={note.archived ? 'Unarchive' : 'Archive'} onClick={() => onArchive(note)}>
+                <IconArchive width="18" height="18" />
+              </button>
+              <button className="icon-btn" title="Move to trash" onClick={() => onTrash(note)}>
+                <IconTrash width="18" height="18" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="icon-btn" title="Restore" onClick={() => onRestore(note)}>
+                <IconRestore />
+              </button>
+              <button className="icon-btn" title="Delete forever" onClick={() => onDeleteForever(note.id)}>
+                <IconClose width="18" height="18" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
 
     {lightboxIndex !== null && (
