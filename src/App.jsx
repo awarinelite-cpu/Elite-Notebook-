@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { useAuth } from './context/AuthContext.jsx'
 import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
@@ -59,6 +61,42 @@ export default function App() {
     const t = setTimeout(() => setToast(null), 5000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // Hardware back button (Android): close whatever's open one layer at a
+  // time — a tool, a note, the drawer, a selection, a search, a non-main
+  // view — and only once none of that is open does it start counting as an
+  // "exit" gesture. Registered once on mount; a ref holds the latest state
+  // so the listener never needs to be torn down and re-added as things
+  // change (avoiding a stale closure without churning the subscription).
+  const backStateRef = useRef()
+  backStateRef.current = { activeTool, editingNote, draft, drawerOpen, selectMode, search, view }
+  const backPressedOnceRef = useRef(false)
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    let handle
+    CapacitorApp.addListener('backButton', () => {
+      const s = backStateRef.current
+      if (s.activeTool) { setActiveTool(null); return }
+      if (s.editingNote) { setEditingNote(null); return }
+      if (s.draft) { setDraft(null); return }
+      if (s.drawerOpen) { setDrawerOpen(false); return }
+      if (s.selectMode) { setSelectedIds(new Set()); return }
+      if (s.search) { setSearch(''); return }
+      if (s.view !== 'notes') { setView('notes'); return }
+
+      // Truly on the bare main page: require a second press within 2s to
+      // actually exit, so one stray back-tap doesn't quit the app.
+      if (backPressedOnceRef.current) {
+        CapacitorApp.exitApp()
+      } else {
+        backPressedOnceRef.current = true
+        setToast('Press back again to exit')
+        setTimeout(() => { backPressedOnceRef.current = false }, 2000)
+      }
+    }).then((h) => { handle = h })
+    return () => { handle?.remove() }
+  }, [])
 
   // Leaving the current view (e.g. via the drawer) exits selection mode so
   // stale selections don't linger against a different list of notes.

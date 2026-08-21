@@ -60,6 +60,7 @@ html, body, #root {
 
 html {
   overflow-x: hidden;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -69,6 +70,7 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
