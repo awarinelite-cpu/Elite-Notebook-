@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
@@ -44,6 +44,15 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
   const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | null
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [editingImage, setEditingImage] = useState(null) // index of image being edited
+  // Long-press image selection, scoped to this open note (mirrors the
+  // grid's long-press-to-select pattern, one level down at the image level).
+  const [imageSelection, setImageSelection] = useState(() => new Set())
+  const imageSelectMode = imageSelection.size > 0
+  const imgLongPressTimer = useRef(null)
+  const imgLongPressFired = useRef(null) // index the long press fired for, or null
+  const imgTouchStartPos = useRef({ x: 0, y: 0 })
+  const IMG_LONG_PRESS_MS = 450
+  const IMG_MOVE_TOLERANCE = 10
   const [reminderAt, setReminderAt] = useState(
     base.reminderAt ? new Date(base.reminderAt).toISOString().slice(0, 16) : ''
   )
@@ -325,6 +334,87 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     if (!url) onUploadError?.()
   }
 
+  function clearImgLongPressTimer() {
+    if (imgLongPressTimer.current) {
+      clearTimeout(imgLongPressTimer.current)
+      imgLongPressTimer.current = null
+    }
+  }
+
+  function toggleImageSelected(i) {
+    setImageSelection((sel) => {
+      const next = new Set(sel)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  function handleThumbTouchStart(i, e) {
+    imgLongPressFired.current = null
+    const touch = e.touches?.[0]
+    if (touch) imgTouchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    clearImgLongPressTimer()
+    // Once already selecting, a plain tap toggles images in and out, so
+    // long press doesn't need to do anything further at that point.
+    if (imageSelectMode) return
+    imgLongPressTimer.current = setTimeout(() => {
+      imgLongPressFired.current = i
+      setImageSelection(new Set([i]))
+      if (navigator.vibrate) navigator.vibrate(10)
+    }, IMG_LONG_PRESS_MS)
+  }
+
+  function handleThumbTouchMove(e) {
+    const touch = e.touches?.[0]
+    if (touch) {
+      const dx = touch.clientX - imgTouchStartPos.current.x
+      const dy = touch.clientY - imgTouchStartPos.current.y
+      if (Math.sqrt(dx * dx + dy * dy) > IMG_MOVE_TOLERANCE) clearImgLongPressTimer()
+    }
+  }
+
+  function handleThumbTouchEnd() {
+    clearImgLongPressTimer()
+  }
+
+  function handleThumbMouseDown(i, e) {
+    if (imageSelectMode || e.button !== 0) return
+    imgLongPressFired.current = null
+    clearImgLongPressTimer()
+    imgLongPressTimer.current = setTimeout(() => {
+      imgLongPressFired.current = i
+      setImageSelection(new Set([i]))
+    }, IMG_LONG_PRESS_MS)
+  }
+
+  function handleThumbMouseUpOrLeave() {
+    clearImgLongPressTimer()
+  }
+
+  function handleThumbClick(i) {
+    // A long press already put us into selection mode: swallow this tap
+    // instead of also opening the lightbox.
+    if (imgLongPressFired.current === i) {
+      imgLongPressFired.current = null
+      return
+    }
+    if (imageSelectMode) {
+      toggleImageSelected(i)
+      return
+    }
+    setLightboxIndex(i)
+  }
+
+  function selectAllImages() {
+    setImageSelection((sel) => (sel.size === images.length ? new Set() : new Set(images.map((_, i) => i))))
+  }
+
+  function deleteSelectedImages() {
+    setImages((imgs) => imgs.filter((_, idx) => !imageSelection.has(idx)))
+    setImageSelection(new Set())
+  }
+
   return (
     <div className="modal-backdrop" onClick={handleClose}>
       <div
@@ -338,24 +428,42 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
       <div className="modal-card-content">
       <div className="note-editor-header">
         <div className="note-editor-topbar">
-          <button className="icon-btn" onClick={handleClose} title="Back">
-            <IconBack width="20" height="20" />
-          </button>
-          <div style={{ flex: 1 }} />
-          <button className="icon-btn" onClick={() => setPinned((v) => !v)} title={pinned ? 'Unpin' : 'Pin'}>
-            {pinned ? <IconUnpin width="19" height="19" /> : <IconPin width="19" height="19" />}
-          </button>
-          <button
-            className="icon-btn"
-            onClick={() => setShowReminder((v) => !v)}
-            title="Reminder"
-            style={reminderAt ? { color: 'var(--accent)' } : undefined}
-          >
-            <IconBell width="19" height="19" />
-          </button>
-          <button className="icon-btn" onClick={() => setArchived((v) => !v)} title={archived ? 'Unarchive' : 'Archive'}>
-            <IconArchive width="19" height="19" />
-          </button>
+          {imageSelectMode ? (
+            <>
+              <button className="icon-btn" onClick={() => setImageSelection(new Set())} title="Cancel selection">
+                <IconClose width="20" height="20" />
+              </button>
+              <span className="selection-bar-count" style={{ marginLeft: 2 }}>{imageSelection.size} selected</span>
+              <button className="selection-bar-textbtn" onClick={selectAllImages}>
+                {imageSelection.size === images.length ? 'Clear all' : 'Select all'}
+              </button>
+              <div style={{ flex: 1 }} />
+              <button className="icon-btn" onClick={deleteSelectedImages} title="Delete selected">
+                <IconTrash width="19" height="19" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="icon-btn" onClick={handleClose} title="Back">
+                <IconBack width="20" height="20" />
+              </button>
+              <div style={{ flex: 1 }} />
+              <button className="icon-btn" onClick={() => setPinned((v) => !v)} title={pinned ? 'Unpin' : 'Pin'}>
+                {pinned ? <IconUnpin width="19" height="19" /> : <IconPin width="19" height="19" />}
+              </button>
+              <button
+                className="icon-btn"
+                onClick={() => setShowReminder((v) => !v)}
+                title="Reminder"
+                style={reminderAt ? { color: 'var(--accent)' } : undefined}
+              >
+                <IconBell width="19" height="19" />
+              </button>
+              <button className="icon-btn" onClick={() => setArchived((v) => !v)} title={archived ? 'Unarchive' : 'Archive'}>
+                <IconArchive width="19" height="19" />
+              </button>
+            </>
+          )}
         </div>
 
         <input
@@ -438,8 +546,21 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
               <div className={`note-editor-image-grid grid-${Math.min(images.length, 6)}`} style={{ margin: 0 }}>
                 {images.map((slot, i) => {
                   const pending = isUploading(slot)
+                  const isSelected = imageSelection.has(i)
                   return (
-                    <div key={pending ? slot.id : `${slot}-${i}`} className="thumb-wrap" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      key={pending ? slot.id : `${slot}-${i}`}
+                      className={`thumb-wrap ${isSelected ? 'thumb-selected' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); if (!pending) handleThumbClick(i) }}
+                      onTouchStart={(e) => !pending && handleThumbTouchStart(i, e)}
+                      onTouchMove={handleThumbTouchMove}
+                      onTouchEnd={handleThumbTouchEnd}
+                      onTouchCancel={handleThumbTouchEnd}
+                      onMouseDown={(e) => !pending && handleThumbMouseDown(i, e)}
+                      onMouseUp={handleThumbMouseUpOrLeave}
+                      onMouseLeave={handleThumbMouseUpOrLeave}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
                       <img
                         src={srcOf(slot)}
                         alt=""
@@ -447,8 +568,12 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
                           cursor: pending ? 'default' : 'pointer',
                           opacity: pending ? 0.6 : 1,
                         }}
-                        onClick={() => !pending && setLightboxIndex(i)}
                       />
+                      {!pending && imageSelectMode && (
+                        <div className={`drive-select-check drive-select-check-card ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <IconCheck width="13" height="13" />}
+                        </div>
+                      )}
                       {pending && (
                         <>
                           <div className="thumb-spinner" aria-label="Uploading">

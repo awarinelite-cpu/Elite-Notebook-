@@ -1901,6 +1901,14 @@ a {
   object-fit: contain;
 }
 
+.thumb-wrap.thumb-selected {
+  box-shadow: 0 0 0 3px #1A73E8 inset;
+}
+
+.thumb-wrap.thumb-selected img {
+  opacity: 0.85;
+}
+
 .thumb-remove {
   position: absolute;
   top: 6px;
