@@ -432,7 +432,12 @@ export default function NoteEditorModal({ note, initial, labels, onClose, onSave
     const results = await Promise.all(
       urls.map(async (url, i) => {
         try {
-          const res = await fetch(url)
+          // Bypass the service worker's CacheFirst route for Firebase Storage
+          // (see sw.js) with a cache-busting param — otherwise a stale opaque
+          // (no-cors) response cached before the bucket's CORS was fixed
+          // keeps getting served here forever instead of a real network hit.
+          const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now()
+          const res = await fetch(bustUrl, { cache: 'no-store' })
           if (!res.ok) throw new Error('bad response')
           const blob = await res.blob()
           return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
