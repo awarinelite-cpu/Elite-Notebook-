@@ -135,6 +135,15 @@ export function IconUserPlus(p) { return (
 export function IconLock(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 )}
+export function IconFingerprint(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}>
+    <path d="M12 3a7 7 0 0 0-7 7c0 2.5.3 4.7 1 6.5" />
+    <path d="M12 3a7 7 0 0 1 7 7c0 1.3-.1 2.5-.3 3.6" />
+    <path d="M8.5 20.5A9 9 0 0 1 6 14a6 6 0 0 1 12 0c0 .8-.05 1.55-.15 2.25" />
+    <path d="M9.5 20.2A6.5 6.5 0 0 1 8.5 14a3.5 3.5 0 0 1 7 0c0 2-.3 3.6-.9 5" />
+    <path d="M12 14v.8c0 1.9-.3 3.6-.9 5" />
+  </svg>
+)}
 export function IconDownload(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 19h16" /></svg>
 )}

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
-import { IconSignOut } from './Icons.jsx'
+import { IconSignOut, IconFingerprint } from './Icons.jsx'
 
 const PIN_LENGTH = 4
 
@@ -45,6 +45,35 @@ export default function SecurityLock({ security }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Fingerprint unlock is only offered once a PIN already exists — see
+  // useSecurity.js. It's a shortcut alongside the PIN, not instead of it.
+  const canUseBiometric = !isSetup && security.biometricEnrolled
+  const [bioChecking, setBioChecking] = useState(false)
+  const [bioError, setBioError] = useState('')
+
+  const tryBiometric = useCallback(async () => {
+    if (busy || bioChecking) return
+    setBioChecking(true)
+    setBioError('')
+    try {
+      const ok = await security.unlockWithBiometric()
+      if (!ok) setBioError('Fingerprint not recognized — try again or use your PIN.')
+    } catch (e) {
+      setBioError(
+        e.name === 'NotAllowedError'
+          ? 'Fingerprint unlock cancelled — use your PIN below.'
+          : (e.message || 'Could not verify fingerprint on this device.')
+      )
+    }
+    setBioChecking(false)
+  }, [security, busy, bioChecking])
+
+  // Prompt for fingerprint automatically the moment the lock screen shows.
+  useEffect(() => {
+    if (canUseBiometric) tryBiometric()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canUseBiometric])
 
   function press(digit) {
     if (busy || value.length >= PIN_LENGTH) return
@@ -103,6 +132,22 @@ export default function SecurityLock({ security }) {
         </div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
+
+        {canUseBiometric && (
+          <>
+            <button
+              type="button"
+              className="lock-biometric-btn"
+              onClick={tryBiometric}
+              disabled={bioChecking || busy}
+            >
+              <IconFingerprint />
+              {bioChecking ? 'Checking fingerprint…' : 'Unlock with Fingerprint'}
+            </button>
+            {bioError && <div className="pin-error">{bioError}</div>}
+            <div className="lock-divider"><span>or enter PIN</span></div>
+          </>
+        )}
 
         <PinDots length={PIN_LENGTH} filled={value.length} />
         {error && <div className="pin-error">{error}</div>}

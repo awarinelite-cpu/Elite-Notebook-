@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
-import { IconSignOut, IconMoon, IconSun, IconLock, IconDownload } from './Icons.jsx'
+import { IconSignOut, IconMoon, IconSun, IconLock, IconDownload, IconFingerprint } from './Icons.jsx'
 import { PinModal } from './SecurityLock.jsx'
 
 const rowStyle = {
@@ -23,6 +23,27 @@ export default function SettingsPanel({ security }) {
   const { theme, toggleTheme } = useTheme()
   const install = useInstallPrompt()
   const [pinModal, setPinModal] = useState(null) // 'setup' | 'change' | 'remove' | null
+  const [bioBusy, setBioBusy] = useState(false)
+  const [bioError, setBioError] = useState('')
+
+  async function toggleBiometric() {
+    setBioError('')
+    if (security.biometricEnrolled) {
+      security.disableBiometric()
+      return
+    }
+    setBioBusy(true)
+    try {
+      await security.enableBiometric()
+    } catch (e) {
+      setBioError(
+        e.name === 'NotAllowedError'
+          ? 'Fingerprint setup was cancelled.'
+          : (e.message || 'Could not set up fingerprint unlock on this device.')
+      )
+    }
+    setBioBusy(false)
+  }
 
   return (
     <div style={{ maxWidth: 420 }}>
@@ -110,6 +131,21 @@ export default function SettingsPanel({ security }) {
                 <IconLock />
                 Lock now
               </button>
+              {security.biometricSupported && (
+                <>
+                  <button style={rowStyle} onClick={toggleBiometric} disabled={bioBusy}>
+                    <IconFingerprint />
+                    {bioBusy
+                      ? 'Setting up…'
+                      : security.biometricEnrolled
+                        ? 'Turn off Fingerprint unlock'
+                        : 'Enable Fingerprint unlock'}
+                  </button>
+                  {bioError && (
+                    <div style={{ color: '#E05252', fontSize: 12.5, margin: '-4px 0 10px 4px' }}>{bioError}</div>
+                  )}
+                </>
+              )}
             </>
           )}
         </>

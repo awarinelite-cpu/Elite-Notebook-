@@ -2,6 +2,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import {
+  isBiometricAvailable,
+  isBiometricEnrolled,
+  enrollBiometric as webauthnEnroll,
+  verifyBiometric as webauthnVerify,
+  disableBiometric as webauthnDisable,
+} from '../utils/biometricAuth.js'
 
 // PINs are never stored or transmitted in plain text — only a SHA-256 hash
 // ever reaches Firestore, computed locally with the Web Crypto API.
@@ -24,14 +31,22 @@ export function useSecurity() {
   const { user } = useAuth()
   const [pinHash, setPinHash] = useState(undefined) // undefined = loading, null = no PIN set
   const [unlocked, setUnlocked] = useState(false)
+  const [biometricSupported, setBiometricSupported] = useState(false)
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false)
+
+  useEffect(() => {
+    isBiometricAvailable().then(setBiometricSupported)
+  }, [])
 
   useEffect(() => {
     if (!user) {
       setPinHash(undefined)
       setUnlocked(false)
+      setBiometricEnrolled(false)
       return
     }
     setUnlocked(sessionStorage.getItem(unlockKey(user.uid)) === '1')
+    setBiometricEnrolled(isBiometricEnrolled(user.uid))
     let cancelled = false
     ;(async () => {
       const snap = await getDoc(doc(db, 'userSecurity', user.uid))
@@ -84,6 +99,28 @@ export function useSecurity() {
     [pinHash, unlock]
   )
 
+  // Fingerprint unlock is only offered once a PIN already exists — it's a
+  // faster alternative to typing the PIN each time, not a replacement for
+  // it, so "Use PIN instead" always still works as a fallback.
+  const enableBiometric = useCallback(async () => {
+    if (!user) return
+    await webauthnEnroll({ id: user.uid, displayName: user.displayName || user.email })
+    setBiometricEnrolled(true)
+  }, [user])
+
+  const disableBiometricUnlock = useCallback(() => {
+    if (!user) return
+    webauthnDisable(user.uid)
+    setBiometricEnrolled(false)
+  }, [user])
+
+  const unlockWithBiometric = useCallback(async () => {
+    if (!user) return false
+    const ok = await webauthnVerify(user.uid)
+    if (ok) unlock()
+    return ok
+  }, [user, unlock])
+
   return {
     loading: pinHash === undefined,
     hasPin: !!pinHash,
@@ -92,5 +129,10 @@ export function useSecurity() {
     removePin,
     verifyPin,
     lock,
+    biometricSupported,
+    biometricEnrolled,
+    enableBiometric,
+    disableBiometric: disableBiometricUnlock,
+    unlockWithBiometric,
   }
 }

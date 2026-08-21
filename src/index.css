@@ -910,6 +910,47 @@ a {
   margin: 6px 0 0;
 }
 
+.lock-biometric-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 24px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 4px 0 0;
+}
+
+.lock-biometric-btn:hover {
+  background: var(--surface-soft);
+}
+
+.lock-biometric-btn:disabled {
+  opacity: 0.6;
+}
+
+.lock-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.lock-divider::before,
+.lock-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
