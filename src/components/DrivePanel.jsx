@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
 import { listFiles, createFolder, uploadFile, trashFile, FOLDER_MIME } from '../lib/driveApi.js'
@@ -81,7 +81,7 @@ function ScaledPreviewFrame({ src, title }) {
   )
 }
 
-export default function DrivePanel() {
+const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const {
     accounts, active, activeEmail, accessToken, connected, expired, hasAnyAccount,
     connecting, error, addAccount, reconnect, disconnect, switchAccount, tokenFor,
@@ -106,6 +106,22 @@ export default function DrivePanel() {
   const uploadInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
+
+  // Hardware back button support: App.jsx asks us first (via this ref)
+  // whether we have an inner layer to close — file preview, in-progress
+  // new-folder form, a selection, or one level of folder navigation —
+  // before it falls back to closing the whole Drive panel. Ordered
+  // innermost-first, matching the visual stack (preview sits on top of
+  // everything, folder depth is the outermost layer within the panel).
+  useImperativeHandle(ref, () => ({
+    handleBack() {
+      if (previewing) { setPreviewing(null); return true }
+      if (creatingFolder) { setCreatingFolder(false); setNewFolderName(''); return true }
+      if (selectMode) { setSelectMode(false); setSelected(new Map()); return true }
+      if (folderStack.length > 0) { setFolderStack((stack) => stack.slice(0, -1)); return true }
+      return false
+    },
+  }))
 
   // Switching the active account means we're looking at a completely
   // different file tree — reset navigation and any in-progress selection.
@@ -568,4 +584,6 @@ export default function DrivePanel() {
       )}
     </div>
   )
-}
+})
+
+export default DrivePanel

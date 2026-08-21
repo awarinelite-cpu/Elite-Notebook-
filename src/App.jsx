@@ -59,6 +59,7 @@ export default function App() {
   // can ask it to close an inner layer (lightbox, image editor, etc.)
   // before falling back to closing the whole note.
   const noteEditorRef = useRef(null)
+  const drivePanelRef = useRef(null)
   const selectMode = selectedIds.size > 0
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function App() {
     if (s.drawerOpen) { setDrawerOpen(false); return true }
     if (s.selectMode) { setSelectedIds(new Set()); return true }
     if (s.search) { setSearch(''); return true }
+    if (s.view === 'drive' && drivePanelRef.current?.handleBack()) return true
     if (s.view !== 'notes') { setView('notes'); return true }
     return false
   }
@@ -417,7 +419,7 @@ export default function App() {
         {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
         {view === 'settings' && <SettingsPanel security={security} />}
         {view === 'help' && <HelpPanel />}
-        {view === 'drive' && <DrivePanel />}
+        {view === 'drive' && <DrivePanel ref={drivePanelRef} />}
         {view === 'keep-import' && (
           <KeepImportPanel
             notes={notes}
