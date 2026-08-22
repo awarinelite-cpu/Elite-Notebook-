@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { App as CapacitorApp } from '@capacitor/app'
 import {
   loadDriveAccounts,
   saveDriveAccounts,
@@ -21,7 +22,6 @@ export function useDriveAuth() {
   })
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState(null)
-  const triedSilentRefresh = useRef(new Set())
 
   function setActiveEmail(email) {
     setActiveEmailState(email)
@@ -104,13 +104,38 @@ export function useDriveAuth() {
     setError(null)
   }, [])
 
-  // If the active account's token has expired, try once to silently
-  // refresh it in the background before falling back to a "reconnect"
-  // prompt.
+  // Tries a silent refresh whenever the active account is expired or about
+  // to be (a few minutes of buffer, so the token doesn't visibly go stale
+  // mid-session) — checked on mount, whenever the active account changes,
+  // and again whenever the app comes back to the foreground (native
+  // resume, or a backgrounded/reopened browser tab). This is what makes
+  // "stay signed in" actually hold across closing and reopening the app:
+  // as long as Google is willing to silently re-authorize (i.e. this
+  // account's authorization hasn't hit Google's own expiry for this
+  // project — see the note on the OAuth consent screen's Testing/
+  // Production status), the person never sees a prompt at all.
   useEffect(() => {
-    if (!active || !isExpired(active) || triedSilentRefresh.current.has(active.email) || connecting) return
-    triedSilentRefresh.current.add(active.email)
-    reconnect(active.email, false)
+    function trySilentRefresh() {
+      if (!active || connecting) return
+      const refreshBufferMs = 5 * 60 * 1000
+      if (active.expiresAt - Date.now() > refreshBufferMs) return
+      reconnect(active.email, false)
+    }
+
+    trySilentRefresh()
+
+    function onVisibility() {
+      if (document.visibilityState === 'visible') trySilentRefresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    let resumeHandle
+    CapacitorApp.addListener('resume', trySilentRefresh).then((h) => { resumeHandle = h })
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      resumeHandle?.remove()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
