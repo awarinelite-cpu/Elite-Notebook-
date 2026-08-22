@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
+import { Share } from '@capacitor/share'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
 import { listFiles, createFolder, uploadFile, trashFile, downloadForTransfer, FOLDER_MIME } from '../lib/driveApi.js'
 import JSZip from 'jszip'
@@ -67,6 +69,21 @@ function isVideoMime(mimeType) { return typeof mimeType === 'string' && mimeType
 // listing files; a 401 here means the token expired mid-session and the
 // caller should refresh it via reconnect() and retry once, same pattern
 // used for loadFiles below.
+// Filesystem.writeFile needs binary data as base64 on native platforms
+// (Blob is web-only there) — used when handing a finished zip to the
+// native share sheet.
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result
+      resolve(typeof result === 'string' ? result.split(',')[1] || '' : '')
+    }
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 async function fetchDriveMediaBlob(fileId, token) {
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -636,33 +653,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       const zipName = items.length === 1 ? `${items[0].name}.zip` : 'Drive items.zip'
       const skippedNote = skipped.length ? ` — ${skipped.length} skipped (couldn't export: ${skipped.join(', ')})` : ''
 
-      const canShareFiles = !!(
-        navigator.share &&
-        navigator.canShare?.({ files: [new File([zipBlob], zipName, { type: 'application/zip' })] })
-      )
-
-      if (canShareFiles) {
-        // Everything above (downloading every file, then zipping) easily
-        // takes long enough that the tap which started this has stopped
-        // counting as "recent user activation" by the time we'd call
-        // navigator.share() here — most browsers silently reject a
-        // file-share call at that point. So the zip is stashed instead,
-        // and a visible "Share now" button supplies its own fresh tap.
-        setPreparedShare({ blob: zipBlob, name: zipName })
-        setActionNotice(`Ready to share${skippedNote}`)
-      } else {
-        const url = URL.createObjectURL(zipBlob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = zipName
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 30000)
-        setActionNotice(`Downloaded${skippedNote}`)
-        setTimeout(() => setActionNotice(null), 6000)
-        clearSelection()
-      }
+      setActionNotice(`Ready to share${skippedNote}`)
+      setPreparedShare({ blob: zipBlob, name: zipName })
     } catch (err) {
       setActionError("Couldn't prepare those items for sharing")
       setActionNotice(null)
@@ -671,14 +663,57 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     }
   }
 
-  function shareReadyZip() {
+  async function shareReadyZip() {
     if (!preparedShare) return
-    const file = new File([preparedShare.blob], preparedShare.name, { type: 'application/zip' })
-    navigator.share({ files: [file], title: preparedShare.name }).catch((err) => {
-      if (err?.name !== 'AbortError') setActionError("Couldn't open the share sheet")
-    })
+    const { blob, name } = preparedShare
     setPreparedShare(null)
-    setActionNotice(null)
+
+    if (Capacitor.isNativePlatform()) {
+      // The browser's Web Share API only allows a fixed list of "safe"
+      // file types through (images/video/audio/pdf/plain text) — a .zip
+      // isn't on that list, which is why sharing one through
+      // navigator.share() fails even though canShare() said yes. The
+      // native Capacitor Share plugin instead calls Android/iOS's real
+      // share sheet directly, the same one used for sharing a picture
+      // from the Gallery/Photos app, which has no such restriction — it
+      // just needs the file written to disk first so it can hand over a
+      // real file:// / content:// URI instead of an in-memory blob.
+      try {
+        setActionNotice('Opening share sheet…')
+        const base64 = await blobToBase64(blob)
+        const written = await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache })
+        await Share.share({ files: [written.uri], title: name, dialogTitle: name })
+        setActionNotice(null)
+      } catch (err) {
+        setActionError("Couldn't open the share sheet")
+        setActionNotice(null)
+      } finally {
+        clearSelection()
+      }
+      return
+    }
+
+    // Plain browser/PWA context (no native share sheet available): try
+    // the Web Share API, but its file-type allowlist means this can still
+    // fail for a zip — fall back to a direct download so the content is
+    // reachable either way.
+    try {
+      const file = new File([blob], name, { type: 'application/zip' })
+      if (!navigator.share || !navigator.canShare?.({ files: [file] })) throw new Error('unsupported')
+      await navigator.share({ files: [file], title: name })
+    } catch (err) {
+      if (err?.name === 'AbortError') { clearSelection(); return }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+      setActionNotice("Downloaded — this browser can't share a .zip directly")
+      setTimeout(() => setActionNotice(null), 6000)
+    }
     clearSelection()
   }
 
