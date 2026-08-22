@@ -5,12 +5,11 @@ import { Share } from '@capacitor/share'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
 import { listFiles, createFolder, uploadFile, trashFile, downloadForTransfer, FOLDER_MIME } from '../lib/driveApi.js'
-import JSZip from 'jszip'
 import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
 import DriveFolderPicker from './DriveFolderPicker.jsx'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause, IconShare } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause, IconShare, IconFileDoc, IconAttachment } from './Icons.jsx'
 
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
 
@@ -330,7 +329,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [selected, setSelected] = useState(new Map()) // id -> file object
   const [transferMode, setTransferMode] = useState(null) // 'copy' | 'move' | null
   const [sharing, setSharing] = useState(false)
-  const [preparedShare, setPreparedShare] = useState(null) // { blob, name } — a finished zip waiting on a fresh tap to share
+  const [showShareMenu, setShowShareMenu] = useState(false)
+  const [preparedShare, setPreparedShare] = useState(null) // { files: [{name, blob}] } — gathered files waiting on a fresh tap to share
   const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
 
@@ -589,16 +589,26 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   // exported to Word/Excel/PowerPoint on the way in (same as copy/move),
   // since they have no bytes of their own; anything that still can't be
   // exported is skipped and reported at the end.
-  async function handleShareSelected() {
+  // Gathers every selected item's real files (recursing into folders,
+  // since Drive has no "download this whole folder" call) as plain
+  // {name, blob} pairs — no zipping. This is the same shape as
+  // NoteEditorModal's shareAsPictures: handing navigator.share an array of
+  // real Files (each keeping its own mimeType) is what lets the OS share
+  // sheet actually open, since a zip's mimeType isn't on the browser's
+  // allowed list but images/audio/video/pdf are. Google Docs/Sheets/Slides
+  // are exported to Word/Excel/PowerPoint on the way in since they have no
+  // bytes of their own (those exported types aren't on that allowlist
+  // either, but still go out fine through the native share sheet).
+  async function handleShareFiles() {
     if (sharing || selected.size === 0) return
     setSharing(true)
+    setShowShareMenu(false)
     setActionError(null)
     setPreparedShare(null)
     setActionNotice('Preparing files…')
 
     // Token can expire partway through a long folder — this mirrors the
-    // 401-then-reconnect retry used elsewhere (loadFiles, media loading),
-    // just wrapped so every call in the recursion benefits from it.
+    // 401-then-reconnect retry used elsewhere (loadFiles, media loading).
     let token = accessToken
     async function driveCall(fn) {
       try {
@@ -615,16 +625,15 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     }
 
     const skipped = []
-    let done = 0
+    const gathered = []
 
-    async function addToZip(item, zipFolder) {
+    async function collect(item) {
       if (item.mimeType === FOLDER_MIME) {
-        const childZip = zipFolder.folder(item.name)
         let pageToken
         do {
           const page = await driveCall((t) => listFiles(t, { parentId: item.id, pageToken }))
           for (const child of page.files || []) {
-            await addToZip(child, childZip)
+            await collect(child)
           }
           pageToken = page.nextPageToken
         } while (pageToken)
@@ -633,9 +642,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       try {
         const payload = await driveCall((t) => downloadForTransfer(t, item))
         if (!payload) { skipped.push(item.name); return }
-        zipFolder.file(payload.name, payload.blob)
-        done++
-        setActionNotice(`Preparing files… (${done} added)`)
+        gathered.push(payload)
+        setActionNotice(`Preparing files… (${gathered.length} added)`)
       } catch {
         skipped.push(item.name)
       }
@@ -643,18 +651,17 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
 
     try {
       const items = Array.from(selected.values())
-      const zip = new JSZip()
       for (const item of items) {
-        await addToZip(item, zip)
+        await collect(item)
       }
-
-      setActionNotice('Zipping…')
-      const zipBlob = await zip.generateAsync({ type: 'blob' })
-      const zipName = items.length === 1 ? `${items[0].name}.zip` : 'Drive items.zip'
+      if (!gathered.length) {
+        setActionError("Couldn't prepare those items for sharing")
+        setActionNotice(null)
+        return
+      }
       const skippedNote = skipped.length ? ` — ${skipped.length} skipped (couldn't export: ${skipped.join(', ')})` : ''
-
       setActionNotice(`Ready to share${skippedNote}`)
-      setPreparedShare({ blob: zipBlob, name: zipName })
+      setPreparedShare({ files: gathered })
     } catch (err) {
       setActionError("Couldn't prepare those items for sharing")
       setActionNotice(null)
@@ -663,26 +670,30 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     }
   }
 
-  async function shareReadyZip() {
+  async function shareReadyFiles() {
     if (!preparedShare) return
-    const { blob, name } = preparedShare
+    const { files: prepared } = preparedShare
     setPreparedShare(null)
 
     if (Capacitor.isNativePlatform()) {
-      // The browser's Web Share API only allows a fixed list of "safe"
-      // file types through (images/video/audio/pdf/plain text) — a .zip
-      // isn't on that list, which is why sharing one through
-      // navigator.share() fails even though canShare() said yes. The
-      // native Capacitor Share plugin instead calls Android/iOS's real
-      // share sheet directly, the same one used for sharing a picture
-      // from the Gallery/Photos app, which has no such restriction — it
-      // just needs the file written to disk first so it can hand over a
-      // real file:// / content:// URI instead of an in-memory blob.
+      // The native Capacitor Share plugin calls Android/iOS's real share
+      // sheet directly — the same one used to share a picture from the
+      // Gallery app — so unlike the browser it isn't limited to a fixed
+      // list of "safe" file types. It just needs each file written to disk
+      // first so it can hand over real file:// / content:// URIs instead
+      // of in-memory blobs.
       try {
         setActionNotice('Opening share sheet…')
-        const base64 = await blobToBase64(blob)
-        const written = await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache })
-        await Share.share({ files: [written.uri], title: name, dialogTitle: name })
+        const uris = []
+        for (const f of prepared) {
+          const base64 = await blobToBase64(f.blob)
+          const written = await Filesystem.writeFile({ path: f.name, data: base64, directory: Directory.Cache })
+          uris.push(written.uri)
+        }
+        await Share.share({
+          files: uris,
+          title: prepared.length === 1 ? prepared[0].name : `${prepared.length} files`,
+        })
         setActionNotice(null)
       } catch (err) {
         setActionError("Couldn't open the share sheet")
@@ -693,25 +704,29 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       return
     }
 
-    // Plain browser/PWA context (no native share sheet available): try
-    // the Web Share API, but its file-type allowlist means this can still
-    // fail for a zip — fall back to a direct download so the content is
-    // reachable either way.
+    // Plain browser/PWA context: try the Web Share API directly with the
+    // real files, same as shareAsPictures does for images — this works
+    // when everything gathered is an image/audio/video/pdf/plain-text
+    // type (Chromium's allowlist), same as those images. Anything outside
+    // that list (e.g. an exported .docx) makes canShare() refuse the
+    // whole batch, so fall back to downloading each file individually.
     try {
-      const file = new File([blob], name, { type: 'application/zip' })
-      if (!navigator.share || !navigator.canShare?.({ files: [file] })) throw new Error('unsupported')
-      await navigator.share({ files: [file], title: name })
+      const fileObjs = prepared.map((f) => new File([f.blob], f.name, { type: f.blob.type || 'application/octet-stream' }))
+      if (!navigator.share || !navigator.canShare?.({ files: fileObjs })) throw new Error('unsupported')
+      await navigator.share({ files: fileObjs, title: fileObjs.length === 1 ? fileObjs[0].name : `${fileObjs.length} files` })
     } catch (err) {
       if (err?.name === 'AbortError') { clearSelection(); return }
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 30000)
-      setActionNotice("Downloaded — this browser can't share a .zip directly")
+      for (const f of prepared) {
+        const url = URL.createObjectURL(f.blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = f.name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 30000)
+      }
+      setActionNotice("Downloaded — this browser can't share these file types directly")
       setTimeout(() => setActionNotice(null), 6000)
     }
     clearSelection()
@@ -720,6 +735,29 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   function cancelPreparedShare() {
     setPreparedShare(null)
     setActionNotice(null)
+  }
+
+  // Shares Drive's own webViewLink for each selected item instead of the
+  // actual bytes — quick, no download/prep needed, but the recipient
+  // needs their own Drive access to open it (same as any Drive link).
+  async function handleShareAsLink() {
+    setShowShareMenu(false)
+    const items = Array.from(selected.values())
+    if (!items.length) return
+    const text = items.map((f) => `${f.name}\n${f.webViewLink}`).join('\n\n')
+    const shareTitle = items.length === 1 ? items[0].name : `${items.length} items`
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, title: shareTitle })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+        setActionNotice('Link(s) copied to clipboard')
+        setTimeout(() => setActionNotice(null), 4000)
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') setActionError("Couldn't share the link")
+    }
+    clearSelection()
   }
 
   async function handleTransferConfirm({ email: destEmail, folderId, folderName }) {
@@ -834,9 +872,21 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       {selected.size > 0 && !preparedShare && (
         <div className="drive-selection-bar">
           <span>{selected.size} selected</span>
-          <button className="pill-btn" onClick={handleShareSelected} disabled={sharing}>
-            <IconShare width="15" height="15" /> Share
-          </button>
+          <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            <button className="pill-btn" onClick={() => setShowShareMenu((v) => !v)} disabled={sharing}>
+              <IconShare width="15" height="15" /> Share
+            </button>
+            {showShareMenu && (
+              <div className="more-menu share-options-menu">
+                <button className="more-menu-item" onClick={handleShareFiles}>
+                  <IconFileDoc width="16" height="16" /> Share files
+                </button>
+                <button className="more-menu-item" onClick={handleShareAsLink}>
+                  <IconAttachment width="16" height="16" /> Share as link
+                </button>
+              </div>
+            )}
+          </div>
           <button className="pill-btn" onClick={() => setTransferMode('copy')}>
             <IconCopyTo width="15" height="15" /> Copy to…
           </button>
@@ -852,8 +902,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
 
       {preparedShare && (
         <div className="drive-selection-bar">
-          <span>{formatSize(preparedShare.blob.size)} ready</span>
-          <button className="pill-btn" onClick={shareReadyZip}>
+          <span>{preparedShare.files.length} file{preparedShare.files.length > 1 ? 's' : ''} ready</span>
+          <button className="pill-btn" onClick={shareReadyFiles}>
             <IconShare width="15" height="15" /> Share now
           </button>
           <button className="text-btn" style={{ marginLeft: 'auto' }} onClick={cancelPreparedShare}>Cancel</button>
