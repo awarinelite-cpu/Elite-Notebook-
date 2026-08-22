@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
 import { listFiles, createFolder, uploadFile, trashFile, FOLDER_MIME } from '../lib/driveApi.js'
 import { transferItems } from '../lib/driveTransfer.js'
@@ -39,12 +40,17 @@ function formatModified(iso) {
 //    that one into the fixed 980px canvas-then-shrink trick clips page
 //    margins before our CSS ever gets a chance to scale it down.
 const OFFICE_DOC_MIME = new Set([
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
+// Word docs specifically get routed to the real Google Docs editor (see
+// openFile below) instead of the embedded preview, since that's the only
+// way to get Google's genuinely mobile-responsive rendering.
+const WORD_MIME = new Set([
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
 function previewUrl(file) {
   const { id, mimeType } = file
@@ -123,6 +129,20 @@ function ResponsivePreviewFrame({ src, title }) {
       />
     </div>
   )
+}
+
+// Opens a URL as a real, top-level page rather than an iframe — a Chrome
+// Custom Tab / SFSafariViewController overlay on the native app (still
+// feels like part of the app, with its own close button back to Elite
+// Notebook), or a new tab in the PWA/browser context. Needed for Word docs
+// because Google's actual mobile-responsive Docs editor refuses to be
+// framed at all (only the fixed-width /preview embed can be).
+async function openInBrowser(url) {
+  if (Capacitor.isNativePlatform()) {
+    await Browser.open({ url })
+  } else {
+    window.open(url, '_blank', 'noopener')
+  }
 }
 
 const DrivePanel = forwardRef(function DrivePanel(props, ref) {
@@ -218,6 +238,18 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     if (f.mimeType === FOLDER_MIME) {
       setSearch('')
       setFolderStack((stack) => [...stack, { id: f.id, name: f.name }])
+      return
+    }
+    if (WORD_MIME.has(f.mimeType)) {
+      // The embedded /preview iframe (used for everything else) is a
+      // fixed, non-responsive canvas for Word docs — same as native
+      // Google Docs — and clips text at both edges once scaled down for
+      // a phone screen. The real Google Docs editor IS mobile-responsive,
+      // but Google won't let it be framed, so it opens as a real page
+      // instead. It uses whichever Google account is already signed into
+      // that browser/device, which may not be the same account connected
+      // for Drive access here.
+      openInBrowser(`https://docs.google.com/document/d/${f.id}/edit`)
       return
     }
     const preview = previewUrl(f)
