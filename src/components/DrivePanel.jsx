@@ -313,6 +313,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [selected, setSelected] = useState(new Map()) // id -> file object
   const [transferMode, setTransferMode] = useState(null) // 'copy' | 'move' | null
   const [sharing, setSharing] = useState(false)
+  const [preparedShare, setPreparedShare] = useState(null) // { blob, name } — a finished zip waiting on a fresh tap to share
   const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
 
@@ -575,6 +576,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     if (sharing || selected.size === 0) return
     setSharing(true)
     setActionError(null)
+    setPreparedShare(null)
     setActionNotice('Preparing files…')
 
     // Token can expire partway through a long folder — this mirrors the
@@ -632,14 +634,23 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       setActionNotice('Zipping…')
       const zipBlob = await zip.generateAsync({ type: 'blob' })
       const zipName = items.length === 1 ? `${items[0].name}.zip` : 'Drive items.zip'
-      const zipFile = new File([zipBlob], zipName, { type: 'application/zip' })
+      const skippedNote = skipped.length ? ` — ${skipped.length} skipped (couldn't export: ${skipped.join(', ')})` : ''
 
-      if (navigator.share && navigator.canShare?.({ files: [zipFile] })) {
-        await navigator.share({ files: [zipFile], title: zipName })
+      const canShareFiles = !!(
+        navigator.share &&
+        navigator.canShare?.({ files: [new File([zipBlob], zipName, { type: 'application/zip' })] })
+      )
+
+      if (canShareFiles) {
+        // Everything above (downloading every file, then zipping) easily
+        // takes long enough that the tap which started this has stopped
+        // counting as "recent user activation" by the time we'd call
+        // navigator.share() here — most browsers silently reject a
+        // file-share call at that point. So the zip is stashed instead,
+        // and a visible "Share now" button supplies its own fresh tap.
+        setPreparedShare({ blob: zipBlob, name: zipName })
+        setActionNotice(`Ready to share${skippedNote}`)
       } else {
-        // No file-sharing support (desktop browser, or an OS share sheet
-        // that refuses this file size) — fall back to a straight download
-        // so the content is still reachable.
         const url = URL.createObjectURL(zipBlob)
         const a = document.createElement('a')
         a.href = url
@@ -648,20 +659,32 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
         a.click()
         a.remove()
         setTimeout(() => URL.revokeObjectURL(url), 30000)
+        setActionNotice(`Downloaded${skippedNote}`)
+        setTimeout(() => setActionNotice(null), 6000)
+        clearSelection()
       }
-
-      setActionNotice(
-        skipped.length
-          ? `Done — ${skipped.length} item${skipped.length > 1 ? 's' : ''} skipped (couldn't export: ${skipped.join(', ')})`
-          : null
-      )
-      if (skipped.length) setTimeout(() => setActionNotice(null), 6000)
     } catch (err) {
-      if (err?.name !== 'AbortError') setActionError("Couldn't prepare those items for sharing")
+      setActionError("Couldn't prepare those items for sharing")
       setActionNotice(null)
     } finally {
       setSharing(false)
     }
+  }
+
+  function shareReadyZip() {
+    if (!preparedShare) return
+    const file = new File([preparedShare.blob], preparedShare.name, { type: 'application/zip' })
+    navigator.share({ files: [file], title: preparedShare.name }).catch((err) => {
+      if (err?.name !== 'AbortError') setActionError("Couldn't open the share sheet")
+    })
+    setPreparedShare(null)
+    setActionNotice(null)
+    clearSelection()
+  }
+
+  function cancelPreparedShare() {
+    setPreparedShare(null)
+    setActionNotice(null)
   }
 
   async function handleTransferConfirm({ email: destEmail, folderId, folderName }) {
@@ -773,7 +796,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
         </div>
       </div>
 
-      {selected.size > 0 && (
+      {selected.size > 0 && !preparedShare && (
         <div className="drive-selection-bar">
           <span>{selected.size} selected</span>
           <button className="pill-btn" onClick={handleShareSelected} disabled={sharing}>
@@ -789,6 +812,16 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
             <IconTrash width="15" height="15" /> Delete
           </button>
           <button className="text-btn" style={{ marginLeft: 'auto' }} onClick={clearSelection}>Cancel</button>
+        </div>
+      )}
+
+      {preparedShare && (
+        <div className="drive-selection-bar">
+          <span>{formatSize(preparedShare.blob.size)} ready</span>
+          <button className="pill-btn" onClick={shareReadyZip}>
+            <IconShare width="15" height="15" /> Share now
+          </button>
+          <button className="text-btn" style={{ marginLeft: 'auto' }} onClick={cancelPreparedShare}>Cancel</button>
         </div>
       )}
 
