@@ -2,7 +2,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { useDriveAuth } from '../hooks/useDriveAuth.js'
-import { listFiles, createFolder, uploadFile, trashFile, FOLDER_MIME } from '../lib/driveApi.js'
+import { listFiles, createFolder, uploadFile, trashFile, downloadForTransfer, FOLDER_MIME } from '../lib/driveApi.js'
+import JSZip from 'jszip'
 import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
@@ -562,29 +563,102 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     setTimeout(() => setActionNotice(null), 6000)
   }
 
-  // Shares Drive's own webViewLink for each selected item (files and
-  // folders alike — Drive returns one for both) through the OS share
-  // sheet, same navigator.share/clipboard pattern App.jsx already uses for
-  // sharing notes. This shares links, not file bytes: whoever receives it
-  // still needs Drive access to actually open the item (same as sharing
-  // any Drive link normally would require).
+  // Shares the actual content of the selected files/folders — not a link.
+  // Folders are walked recursively (Drive's API has no "download this
+  // whole folder" endpoint), every file's real bytes are pulled down, and
+  // everything is packed into a single .zip that goes out through the OS
+  // share sheet as a real file attachment. Google Docs/Sheets/Slides are
+  // exported to Word/Excel/PowerPoint on the way in (same as copy/move),
+  // since they have no bytes of their own; anything that still can't be
+  // exported is skipped and reported at the end.
   async function handleShareSelected() {
     if (sharing || selected.size === 0) return
     setSharing(true)
+    setActionError(null)
+    setActionNotice('Preparing files…')
+
+    // Token can expire partway through a long folder — this mirrors the
+    // 401-then-reconnect retry used elsewhere (loadFiles, media loading),
+    // just wrapped so every call in the recursion benefits from it.
+    let token = accessToken
+    async function driveCall(fn) {
+      try {
+        return await fn(token)
+      } catch (e) {
+        if (e.status === 401) {
+          const fresh = await reconnect(email, true)
+          if (!fresh) throw e
+          token = fresh.accessToken
+          return fn(token)
+        }
+        throw e
+      }
+    }
+
+    const skipped = []
+    let done = 0
+
+    async function addToZip(item, zipFolder) {
+      if (item.mimeType === FOLDER_MIME) {
+        const childZip = zipFolder.folder(item.name)
+        let pageToken
+        do {
+          const page = await driveCall((t) => listFiles(t, { parentId: item.id, pageToken }))
+          for (const child of page.files || []) {
+            await addToZip(child, childZip)
+          }
+          pageToken = page.nextPageToken
+        } while (pageToken)
+        return
+      }
+      try {
+        const payload = await driveCall((t) => downloadForTransfer(t, item))
+        if (!payload) { skipped.push(item.name); return }
+        zipFolder.file(payload.name, payload.blob)
+        done++
+        setActionNotice(`Preparing files… (${done} added)`)
+      } catch {
+        skipped.push(item.name)
+      }
+    }
+
     try {
       const items = Array.from(selected.values())
-      const shareText = items.map((f) => `${f.name}\n${f.webViewLink}`).join('\n\n')
-      const shareTitle = items.length === 1 ? items[0].name : `${items.length} items from Drive`
-
-      if (navigator.share) {
-        await navigator.share({ title: shareTitle, text: shareText })
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText)
-        setActionNotice('Link copied to clipboard')
-        setTimeout(() => setActionNotice(null), 4000)
+      const zip = new JSZip()
+      for (const item of items) {
+        await addToZip(item, zip)
       }
+
+      setActionNotice('Zipping…')
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const zipName = items.length === 1 ? `${items[0].name}.zip` : 'Drive items.zip'
+      const zipFile = new File([zipBlob], zipName, { type: 'application/zip' })
+
+      if (navigator.share && navigator.canShare?.({ files: [zipFile] })) {
+        await navigator.share({ files: [zipFile], title: zipName })
+      } else {
+        // No file-sharing support (desktop browser, or an OS share sheet
+        // that refuses this file size) — fall back to a straight download
+        // so the content is still reachable.
+        const url = URL.createObjectURL(zipBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = zipName
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 30000)
+      }
+
+      setActionNotice(
+        skipped.length
+          ? `Done — ${skipped.length} item${skipped.length > 1 ? 's' : ''} skipped (couldn't export: ${skipped.join(', ')})`
+          : null
+      )
+      if (skipped.length) setTimeout(() => setActionNotice(null), 6000)
     } catch (err) {
-      if (err?.name !== 'AbortError') setActionError("Couldn't share those items")
+      if (err?.name !== 'AbortError') setActionError("Couldn't prepare those items for sharing")
+      setActionNotice(null)
     } finally {
       setSharing(false)
     }
