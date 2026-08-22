@@ -7,7 +7,7 @@ import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
 import DriveFolderPicker from './DriveFolderPicker.jsx'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause, IconShare } from './Icons.jsx'
 
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
 
@@ -311,6 +311,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState(new Map()) // id -> file object
   const [transferMode, setTransferMode] = useState(null) // 'copy' | 'move' | null
+  const [sharing, setSharing] = useState(false)
   const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
 
@@ -561,6 +562,34 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     setTimeout(() => setActionNotice(null), 6000)
   }
 
+  // Shares Drive's own webViewLink for each selected item (files and
+  // folders alike — Drive returns one for both) through the OS share
+  // sheet, same navigator.share/clipboard pattern App.jsx already uses for
+  // sharing notes. This shares links, not file bytes: whoever receives it
+  // still needs Drive access to actually open the item (same as sharing
+  // any Drive link normally would require).
+  async function handleShareSelected() {
+    if (sharing || selected.size === 0) return
+    setSharing(true)
+    try {
+      const items = Array.from(selected.values())
+      const shareText = items.map((f) => `${f.name}\n${f.webViewLink}`).join('\n\n')
+      const shareTitle = items.length === 1 ? items[0].name : `${items.length} items from Drive`
+
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText)
+        setActionNotice('Link copied to clipboard')
+        setTimeout(() => setActionNotice(null), 4000)
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') setActionError("Couldn't share those items")
+    } finally {
+      setSharing(false)
+    }
+  }
+
   async function handleTransferConfirm({ email: destEmail, folderId, folderName }) {
     const mode = transferMode
     const items = Array.from(selected.values())
@@ -673,6 +702,9 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       {selected.size > 0 && (
         <div className="drive-selection-bar">
           <span>{selected.size} selected</span>
+          <button className="pill-btn" onClick={handleShareSelected} disabled={sharing}>
+            <IconShare width="15" height="15" /> Share
+          </button>
           <button className="pill-btn" onClick={() => setTransferMode('copy')}>
             <IconCopyTo width="15" height="15" /> Copy to…
           </button>
