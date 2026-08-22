@@ -28,20 +28,31 @@ function formatModified(iso) {
 //    embed of the actual editor UI: a fixed-width desktop canvas (~980px)
 //    that is NOT responsive on its own. It needs to be rendered at that
 //    native width and scaled down to fit, or text runs off the right edge.
-//  - drive.google.com/file/d/.../preview (everything else — uploaded
-//    .docx/.pdf/images, i.e. every non-native file, which is most of what
-//    people keep on Drive) is Google's universal file previewer, which IS
+//    Uploaded Word/PowerPoint/Excel files (.docx/.pptx/.xlsx, and their
+//    legacy .doc/.ppt/.xls equivalents) go through this same non-responsive
+//    Docs-style renderer when previewed — Drive converts them through the
+//    editor UI, not the universal file previewer — so they need the same
+//    fixed-width treatment as native Google Docs/Sheets/Slides.
+//  - drive.google.com/file/d/.../preview for everything else (PDFs,
+//    images, etc.) is Google's universal file previewer, which IS
 //    responsive to whatever width its iframe is actually given. Forcing
-//    that one into the same fixed 980px canvas-then-shrink trick was the
-//    bug: at 980px the previewer was already clipping page margins before
-//    our CSS ever got a chance to scale it down, so shrinking afterwards
-//    just shrank the already-cropped result.
+//    that one into the fixed 980px canvas-then-shrink trick clips page
+//    margins before our CSS ever gets a chance to scale it down.
+const OFFICE_DOC_MIME = new Set([
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
 function previewUrl(file) {
   const { id, mimeType } = file
   if (mimeType === 'application/vnd.google-apps.document') return { url: `https://docs.google.com/document/d/${id}/preview`, fixedWidth: true }
   if (mimeType === 'application/vnd.google-apps.spreadsheet') return { url: `https://docs.google.com/spreadsheets/d/${id}/preview`, fixedWidth: true }
   if (mimeType === 'application/vnd.google-apps.presentation') return { url: `https://docs.google.com/presentation/d/${id}/preview`, fixedWidth: true }
   if (mimeType === FOLDER_MIME) return null
+  if (OFFICE_DOC_MIME.has(mimeType)) return { url: `https://drive.google.com/file/d/${id}/preview`, fixedWidth: true }
   return { url: `https://drive.google.com/file/d/${id}/preview`, fixedWidth: false }
 }
 
