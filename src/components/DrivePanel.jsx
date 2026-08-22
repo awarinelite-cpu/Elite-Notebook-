@@ -54,6 +54,11 @@ const WORD_MIME = new Set([
 ])
 function previewUrl(file) {
   const { id, mimeType } = file
+  // Note: native Google Docs (application/vnd.google-apps.document) never
+  // reach this fixed-width branch in practice — openFile() intercepts them
+  // earlier and routes to the real editor instead, same as Word docs. The
+  // line below is kept only as a fallback in case this function is ever
+  // called directly without going through that check.
   if (mimeType === 'application/vnd.google-apps.document') return { url: `https://docs.google.com/document/d/${id}/preview`, fixedWidth: true }
   if (mimeType === 'application/vnd.google-apps.spreadsheet') return { url: `https://docs.google.com/spreadsheets/d/${id}/preview`, fixedWidth: true }
   if (mimeType === 'application/vnd.google-apps.presentation') return { url: `https://docs.google.com/presentation/d/${id}/preview`, fixedWidth: true }
@@ -240,7 +245,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       setFolderStack((stack) => [...stack, { id: f.id, name: f.name }])
       return
     }
-    if (WORD_MIME.has(f.mimeType)) {
+    if (WORD_MIME.has(f.mimeType) || f.mimeType === 'application/vnd.google-apps.document') {
       // The embedded /preview iframe (used for everything else) is a
       // fixed, non-responsive canvas for Word docs — same as native
       // Google Docs — and clips text at both edges once scaled down for
@@ -249,6 +254,12 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       // instead. It uses whichever Google account is already signed into
       // that browser/device, which may not be the same account connected
       // for Drive access here.
+      //
+      // Native Google Docs (mimeType application/vnd.google-apps.document)
+      // hit this same fixed-width canvas as uploaded .docx files — if a
+      // user's Drive is set to auto-convert uploads, a "Word doc" they
+      // uploaded may already BE this mimeType, not the raw .docx one, so
+      // it needs the same real-editor treatment.
       openInBrowser(`https://docs.google.com/document/d/${f.id}/edit`)
       return
     }
