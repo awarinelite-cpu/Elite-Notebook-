@@ -7,7 +7,7 @@ import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
 import DriveFolderPicker from './DriveFolderPicker.jsx'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause } from './Icons.jsx'
 
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
 
@@ -52,6 +52,31 @@ const WORD_MIME = new Set([
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ])
+
+// Audio/video files play in-app via a real <audio>/<video> element instead
+// of Drive's /preview iframe (which has a cramped, non-native player UI and
+// no playlist). Drive doesn't expose a mimeType allowlist for "media" the
+// way it does for docs — any audio/* or video/* file qualifies.
+function isAudioMime(mimeType) { return typeof mimeType === 'string' && mimeType.startsWith('audio/') }
+function isVideoMime(mimeType) { return typeof mimeType === 'string' && mimeType.startsWith('video/') }
+
+// Downloads the actual file bytes (not just metadata) using the Drive v3
+// "alt=media" endpoint, so they can be handed to a native <audio>/<video>
+// element as a blob: URL. This requires the same bearer token used for
+// listing files; a 401 here means the token expired mid-session and the
+// caller should refresh it via reconnect() and retry once, same pattern
+// used for loadFiles below.
+async function fetchDriveMediaBlob(fileId, token) {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    const err = new Error(`Drive media fetch failed (${res.status})`)
+    err.status = res.status
+    throw err
+  }
+  return res.blob()
+}
 function previewUrl(file) {
   const { id, mimeType } = file
   // Note: native Google Docs (application/vnd.google-apps.document) never
@@ -150,6 +175,117 @@ async function openInBrowser(url) {
   }
 }
 
+// Persistent bottom bar for audio playback. Stays mounted (and audio keeps
+// playing) while the user browses other folders, since it's rendered
+// alongside the file grid rather than inside the preview overlay. src is a
+// blob: URL for the currently loaded track, or null while it's fetching.
+function MiniAudioPlayer({ file, src, loading, error, hasPrev, hasNext, onPrev, onNext, onClose }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+
+  useEffect(() => {
+    setProgress(0)
+    setDuration(0)
+  }, [src])
+
+  useEffect(() => {
+    if (!src) return
+    const el = audioRef.current
+    if (!el) return
+    el.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+  }, [src])
+
+  function togglePlay() {
+    const el = audioRef.current
+    if (!el || !src) return
+    if (el.paused) { el.play(); setPlaying(true) } else { el.pause(); setPlaying(false) }
+  }
+
+  function seek(e) {
+    const el = audioRef.current
+    if (!el || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    el.currentTime = ratio * duration
+    setProgress(ratio * duration)
+  }
+
+  function fmt(t) {
+    if (!Number.isFinite(t)) return '0:00'
+    const m = Math.floor(t / 60)
+    const s = Math.floor(t % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
+  return (
+    <div className="media-mini-player">
+      {src && (
+        <audio
+          ref={audioRef}
+          src={src}
+          onTimeUpdate={(e) => setProgress(e.target.currentTime)}
+          onLoadedMetadata={(e) => setDuration(e.target.duration)}
+          onEnded={onNext}
+          onPause={() => setPlaying(false)}
+          onPlay={() => setPlaying(true)}
+        />
+      )}
+      <div className="media-mini-seek" onClick={seek}>
+        <div className="media-mini-seek-fill" style={{ width: duration ? `${(progress / duration) * 100}%` : '0%' }} />
+      </div>
+      <div className="media-mini-row">
+        <div className="media-mini-info">
+          <span className="media-mini-title">{file.name}</span>
+          <span className="media-mini-status">
+            {error ? error : loading ? 'Loading…' : duration ? `${fmt(progress)} / ${fmt(duration)}` : ''}
+          </span>
+        </div>
+        <div className="media-mini-controls">
+          <button className="media-mini-btn" onClick={onPrev} disabled={!hasPrev} aria-label="Previous track">&#8249;</button>
+          <button className="media-mini-btn media-mini-play" onClick={togglePlay} disabled={!src} aria-label={playing ? 'Pause' : 'Play'}>
+            {playing ? <IconPause width="20" height="20" /> : <IconPlay width="20" height="20" />}
+          </button>
+          <button className="media-mini-btn" onClick={onNext} disabled={!hasNext} aria-label="Next track">&#8250;</button>
+          <button className="media-mini-btn" onClick={onClose} aria-label="Close player">
+            <IconClose width="16" height="16" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Full-screen native <video> player, same fixed-overlay shell as the
+// document preview (drive-preview-full) so it feels consistent, but with a
+// real <video controls> element instead of an iframe.
+function VideoPlayerModal({ file, src, loading, error, hasPrev, hasNext, onPrev, onNext, onClose }) {
+  return (
+    <div className="drive-preview-full media-video-full">
+      <div className="drive-preview-header">
+        <button className="icon-toggle-btn" onClick={onClose} aria-label="Back">
+          <IconClose />
+        </button>
+        <span className="drive-preview-title">{file.name}</span>
+      </div>
+      <div className="media-video-wrap">
+        {src ? (
+          <video className="media-video-el" src={src} controls autoPlay onEnded={onNext} />
+        ) : (
+          <p className="media-video-status">{error || 'Loading…'}</p>
+        )}
+      </div>
+      {(hasPrev || hasNext) && (
+        <div className="media-video-nav">
+          <button onClick={onPrev} disabled={!hasPrev}>&#8249; Previous</button>
+          <button onClick={onNext} disabled={!hasNext}>Next &#8250;</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const {
     accounts, active, activeEmail, accessToken, connected, expired, hasAnyAccount,
@@ -161,6 +297,10 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [loadError, setLoadError] = useState(null)
   const [search, setSearch] = useState('')
   const [previewing, setPreviewing] = useState(null)
+  const [media, setMedia] = useState(null) // { queue: [file...], index, kind: 'audio' | 'video' }
+  const [mediaSrc, setMediaSrc] = useState(null) // blob: URL for media.queue[media.index]
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const [mediaError, setMediaError] = useState(null)
   const [folderStack, setFolderStack] = useState([]) // [{ id, name }], in-app folder navigation
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -245,6 +385,14 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
       setFolderStack((stack) => [...stack, { id: f.id, name: f.name }])
       return
     }
+    if (isAudioMime(f.mimeType) || isVideoMime(f.mimeType)) {
+      const kind = isAudioMime(f.mimeType) ? 'audio' : 'video'
+      const test = kind === 'audio' ? isAudioMime : isVideoMime
+      const queue = (files || []).filter((x) => test(x.mimeType))
+      const index = Math.max(0, queue.findIndex((x) => x.id === f.id))
+      setMedia({ queue, index, kind })
+      return
+    }
     if (WORD_MIME.has(f.mimeType) || f.mimeType === 'application/vnd.google-apps.document') {
       // The embedded /preview iframe (used for everything else) is a
       // fixed, non-responsive canvas for Word docs — same as native
@@ -266,6 +414,61 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     const preview = previewUrl(f)
     if (preview) setPreviewing({ url: preview.url, name: f.name, fixedWidth: preview.fixedWidth })
     else window.open(f.webViewLink, '_blank', 'noopener')
+  }
+
+  // Loads the actual bytes for whichever track/video is current (media
+  // changes on open, and again on next/prev), swapping in a fresh blob:
+  // URL each time and revoking the previous one so we don't leak memory
+  // across a long playlist session.
+  useEffect(() => {
+    if (!media) { setMediaSrc(null); setMediaError(null); return }
+    let cancelled = false
+    let objectUrl = null
+    setMediaSrc(null)
+    setMediaError(null)
+    setMediaLoading(true)
+    const file = media.queue[media.index]
+    ;(async () => {
+      try {
+        let blob
+        try {
+          blob = await fetchDriveMediaBlob(file.id, accessToken)
+        } catch (e) {
+          if (e.status === 401) {
+            const fresh = await reconnect(email, true)
+            if (!fresh) throw e
+            blob = await fetchDriveMediaBlob(file.id, fresh.accessToken)
+          } else {
+            throw e
+          }
+        }
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setMediaSrc(objectUrl)
+      } catch (e) {
+        if (!cancelled) setMediaError("Couldn't load this file")
+      } finally {
+        if (!cancelled) setMediaLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media])
+
+  function mediaGo(delta) {
+    setMedia((m) => {
+      if (!m) return m
+      const next = m.index + delta
+      if (next < 0 || next >= m.queue.length) return m
+      return { ...m, index: next }
+    })
+  }
+
+  function closeMedia() {
+    setMedia(null)
   }
 
   function goToCrumb(index) {
@@ -658,6 +861,34 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
             ? <ScaledPreviewFrame src={previewing.url} title={previewing.name} />
             : <ResponsivePreviewFrame src={previewing.url} title={previewing.name} />}
         </div>
+      )}
+
+      {media && media.kind === 'video' && (
+        <VideoPlayerModal
+          file={media.queue[media.index]}
+          src={mediaSrc}
+          loading={mediaLoading}
+          error={mediaError}
+          hasPrev={media.index > 0}
+          hasNext={media.index < media.queue.length - 1}
+          onPrev={() => mediaGo(-1)}
+          onNext={() => mediaGo(1)}
+          onClose={closeMedia}
+        />
+      )}
+
+      {media && media.kind === 'audio' && (
+        <MiniAudioPlayer
+          file={media.queue[media.index]}
+          src={mediaSrc}
+          loading={mediaLoading}
+          error={mediaError}
+          hasPrev={media.index > 0}
+          hasNext={media.index < media.queue.length - 1}
+          onPrev={() => mediaGo(-1)}
+          onNext={() => mediaGo(1)}
+          onClose={closeMedia}
+        />
       )}
 
       {transferMode && (
