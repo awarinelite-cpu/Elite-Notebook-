@@ -12,6 +12,13 @@ clientsClaim()
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
+// One-time cleanup: drop the old attachments cache that may hold entries
+// cached as "successful" during the Storage billing outage (see sw.js
+// note on 'note-attachments-v2' below).
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.delete('note-attachments'))
+})
+
 registerRoute(
   ({ url }) => url.origin === 'https://fonts.googleapis.com',
   new CacheFirst({ cacheName: 'google-fonts-stylesheets' })
@@ -28,7 +35,14 @@ registerRoute(
 registerRoute(
   ({ url }) => url.origin === 'https://firebasestorage.googleapis.com',
   new CacheFirst({
-    cacheName: 'note-attachments',
+    // Renamed from 'note-attachments' -> 'note-attachments-v2' to invalidate
+    // entries cached while Firebase Storage billing was broken: with no-cors
+    // requests every response (success or failure) comes back as an opaque
+    // status-0 response, so CacheableResponsePlugin([0,200]) had no way to
+    // tell a real image apart from a quota-exceeded failure and cached the
+    // failures as if they were good. Bumping the name orphans that bad
+    // cache and forces a clean re-fetch for every attachment.
+    cacheName: 'note-attachments-v2',
     plugins: [
       // <img>/<audio> requests to a cross-origin URL are made in 'no-cors'
       // mode, so the response comes back opaque (status 0) — accept those
