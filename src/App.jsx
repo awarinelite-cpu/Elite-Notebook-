@@ -489,7 +489,7 @@ export default function App() {
           onSave={updateNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
-          onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+          onUploadError={() => setToast(error ? `Upload failed: ${error}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
           onToast={(msg) => setToast(msg)}
         />
       )}
@@ -505,7 +505,7 @@ export default function App() {
           onSave={updateNote}
           onDeleteForever={deleteNoteForever}
           onUploadImage={uploadImage}
-          onUploadError={() => setToast("Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+          onUploadError={() => setToast(error ? `Upload failed: ${error}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
           onToast={(msg) => setToast(msg)}
         />
       )}
