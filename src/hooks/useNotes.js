@@ -104,16 +104,19 @@ export function useNotes() {
   }
 
   async function uploadImage(file) {
-    if (!user) return null
+    if (!user) return { url: null, error: 'Not signed in' }
     try {
       const path = `notes/${user.uid}/${Date.now()}-${file.name}`
       const storageRef = ref(storage, path)
       await uploadBytes(storageRef, file)
-      return await getDownloadURL(storageRef)
+      const url = await getDownloadURL(storageRef)
+      return { url, error: null }
     } catch (err) {
       console.error('uploadImage failed:', err)
       setError(err.message)
-      return null
+      // Returned directly (not just via state) so callers can show the
+      // real message immediately instead of racing a state update.
+      return { url: null, error: err.code ? `${err.code}: ${err.message}` : err.message }
     }
   }
 

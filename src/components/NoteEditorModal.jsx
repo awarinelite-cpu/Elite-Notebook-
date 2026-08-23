@@ -241,7 +241,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     setImages((imgs) => [...imgs, ...placeholders])
 
     const results = await Promise.all(
-      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((res) => ({ ph, url: res.url, error: res.error })))
     )
 
     setImages((imgs) => {
@@ -254,7 +254,8 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       return next
     })
     results.forEach(({ ph }) => URL.revokeObjectURL(ph.previewUrl))
-    if (results.some((r) => !r.url)) onUploadError?.()
+    const failed = results.find((r) => !r.url)
+    if (failed) onUploadError?.(failed.error)
   }
 
   function handleFile(e) {
@@ -274,7 +275,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     setAudioClips((clips) => [...clips, ...placeholders])
 
     const results = await Promise.all(
-      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((res) => ({ ph, url: res.url, error: res.error })))
     )
 
     setAudioClips((clips) => {
@@ -287,7 +288,8 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       return next
     })
     results.forEach(({ ph }) => URL.revokeObjectURL(ph.previewUrl))
-    if (results.some((r) => !r.url)) onUploadError?.()
+    const failed = results.find((r) => !r.url)
+    if (failed) onUploadError?.(failed.error)
   }
 
   function handleDrawingSave(blob) {
@@ -318,7 +320,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     setAttachments((atts) => [...atts, ...placeholders])
 
     const results = await Promise.all(
-      placeholders.map((ph, i) => onUploadImage(files[i]).then((url) => ({ ph, url })))
+      placeholders.map((ph, i) => onUploadImage(files[i]).then((res) => ({ ph, url: res.url, error: res.error })))
     )
 
     setAttachments((atts) => {
@@ -330,7 +332,8 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       }
       return next
     })
-    if (results.some((r) => !r.url)) onUploadError?.()
+    const failed = results.find((r) => !r.url)
+    if (failed) onUploadError?.(failed.error)
   }
 
   function handleDocFile(e) {
@@ -349,9 +352,9 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     setImages((imgs) =>
       imgs.map((slot, i) => (i === idx ? { id: placeholderId, previewUrl: URL.createObjectURL(file), uploading: true } : slot))
     )
-    const url = await onUploadImage(file)
+    const { url, error } = await onUploadImage(file)
     setImages((imgs) => imgs.map((slot) => (typeof slot !== 'string' && slot.id === placeholderId ? (url || original) : slot)))
-    if (!url) onUploadError?.()
+    if (!url) onUploadError?.(error)
   }
 
   function clearImgLongPressTimer() {
