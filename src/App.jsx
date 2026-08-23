@@ -225,7 +225,8 @@ export default function App() {
         (n) =>
           n.title?.toLowerCase().includes(q) ||
           stripHtml(n.text).toLowerCase().includes(q) ||
-          n.checklist?.some((c) => c.text?.toLowerCase().includes(q))
+          n.checklist?.some((c) => c.text?.toLowerCase().includes(q)) ||
+          Object.values(n.imageText || {}).some((t) => t.toLowerCase().includes(q))
       )
     }
 

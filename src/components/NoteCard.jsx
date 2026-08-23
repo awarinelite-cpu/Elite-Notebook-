@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
-import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare, IconCheck } from './Icons.jsx'
+import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare, IconCheck, IconText } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
@@ -206,11 +206,18 @@ export default function NoteCard({
       {note.title && <h3>{note.title}</h3>}
 
       {images.length === 1 && (
-        <img
-          src={images[0]}
-          alt=""
-          onClick={(e) => { e.stopPropagation(); setLightboxIndex(0) }}
-        />
+        <div className="note-card-image-wrap">
+          <img
+            src={images[0]}
+            alt=""
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex(0) }}
+          />
+          {note.imageText?.[images[0]] && (
+            <div className="note-card-ocr-badge" title="Text in this photo is searchable">
+              <IconText width="11" height="11" />
+            </div>
+          )}
+        </div>
       )}
 
       {images.length > 1 && (

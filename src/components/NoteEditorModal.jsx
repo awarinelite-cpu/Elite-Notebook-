@@ -7,6 +7,7 @@ import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
 import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { extractTextFromImages } from '../lib/ocr.js'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
 
@@ -40,6 +41,10 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
   const [background, setBackground] = useState(base.background || 'none')
   const [selectedLabels, setSelectedLabels] = useState(base.labels || [])
   const [images, setImages] = useState(base.images || [])
+  // Text OCR has pulled out of each image, keyed by the image's final
+  // Storage URL. Persisted on the note as `imageText` so search can match
+  // words that only appear inside a photo (an exam number, a drug label).
+  const [ocrText, setOcrText] = useState(base.imageText || {})
   const [audioClips, setAudioClips] = useState(base.audio || [])
   const [attachments, setAttachments] = useState(base.files || [])
   const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | null
@@ -121,6 +126,11 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       background,
       labels: selectedLabels,
       images: images.filter((img) => typeof img === 'string'),
+      // Filtered against the current image list so a removed/replaced
+      // image's leftover OCR text never lingers in the saved note.
+      imageText: Object.fromEntries(
+        Object.entries(ocrText).filter(([url]) => images.includes(url))
+      ),
       audio: audioClips.filter((clip) => typeof clip === 'string'),
       files: attachments.filter((a) => !a.uploading).map((a) => ({ url: a.url, name: a.name, size: a.size, type: a.type })),
       reminderAt: reminderAt ? new Date(reminderAt).toISOString() : null,
@@ -161,7 +171,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     }, 600)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, text, checklist, color, background, selectedLabels, images, audioClips, attachments, reminderAt, pinned, archived])
+  }, [title, text, checklist, color, background, selectedLabels, images, ocrText, audioClips, attachments, reminderAt, pinned, archived])
 
   function handleClose() {
     const patch = buildPatch()
@@ -256,6 +266,22 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     results.forEach(({ ph }) => URL.revokeObjectURL(ph.previewUrl))
     const failed = results.find((r) => !r.url)
     if (failed) onUploadError?.(failed.error)
+
+    // OCR runs in the background against the original files (avoids a
+    // re-download of what was just uploaded) and is intentionally not
+    // awaited — extracted text lands in search a few seconds after the
+    // image itself does, rather than making the person wait on it.
+    const succeeded = results.filter((r) => r.url)
+    if (succeeded.length) {
+      extractTextFromImages(
+        succeeded.map((r) => files[placeholders.indexOf(r.ph)]),
+        (idx, text) => {
+          if (!text) return
+          const url = succeeded[idx].url
+          setOcrText((prev) => ({ ...prev, [url]: text }))
+        }
+      )
+    }
   }
 
   function handleFile(e) {
@@ -354,6 +380,11 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     )
     const { url, error } = await onUploadImage(file)
     setImages((imgs) => imgs.map((slot) => (typeof slot !== 'string' && slot.id === placeholderId ? (url || original) : slot)))
+    // Edited pixels can change the text in the photo (crop, rotate), so
+    // re-run OCR against the edit rather than carrying over the old result.
+    if (url) extractTextFromImages([file], (_, text) => {
+      if (text) setOcrText((prev) => ({ ...prev, [url]: text }))
+    })
     if (!url) onUploadError?.(error)
   }
 
