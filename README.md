@@ -33,7 +33,19 @@ Keep-style notes today; Google Drive document linking arrives in phase 2.
    ```
    (`firestore.rules` is already in this repo, scoped so a user can only read/write their own notes and labels.)
 
-7. Install and run:
+7. **Set CORS on the Storage bucket** (needed for image editing — rotate/crop/flip/brightness/contrast). Without this, the in-app image editor fails with "Couldn't load this image for editing." A brand-new Firebase Storage bucket has no CORS config at all, so this step is required, not optional:
+   ```
+   gcloud auth login
+   gcloud config set project <your-firebase-project-id>
+   gsutil cors set cors.json gs://<your-storage-bucket>.appspot.com
+   ```
+   `cors.json` is already in this repo. Verify it took effect with:
+   ```
+   gsutil cors get gs://<your-storage-bucket>.appspot.com
+   ```
+   (Ordinary note images still display fine without this — they're loaded as plain `<img src>`. It's specifically the editor's canvas-based rotate/crop that needs the browser to read the image's pixel data cross-origin, which requires the bucket to send CORS headers.)
+
+8. Install and run:
    ```
    npm install
    npm run dev

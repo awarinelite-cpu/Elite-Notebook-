@@ -116,8 +116,9 @@ export default function ImageEditor({ src, onCancel, onSave }) {
         <div className="editor-canvas-wrap">
           {loadError ? (
             <p className="drive-error" style={{ padding: 20 }}>
-              Couldn't load this image for editing (it may be blocked by the storage bucket's
-              CORS settings). Try again, or edit a fresh screenshot before uploading.
+              Couldn't load this image for editing — the storage bucket has no CORS policy set,
+              so the browser can't read its pixel data. Run <code>gsutil cors set cors.json gs://&lt;your-bucket&gt;</code> (see
+              README) to fix this for every image, or try again after that.
             </p>
           ) : (
             <canvas ref={previewRef} className="editor-canvas" />
