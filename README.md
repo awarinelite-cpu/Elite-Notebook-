@@ -6,7 +6,10 @@ Keep-style notes today; Google Drive document linking arrives in phase 2.
 
 - Google sign-in (Firebase Auth)
 - Notes: title, body text, checklists, images, seven paper colors, labels, pinning
-- Reminders (date/time tag shown on the note; overdue ones highlight)
+- Reminders (date/time tag shown on the note, overdue ones highlight) with real notifications:
+  - **Native (Android/iOS):** an OS-scheduled notification fires at the reminder time even if the app is fully closed (`@capacitor/local-notifications`). Tapping it opens the note directly.
+  - **Web/PWA:** notifications fire while the tab/app is open, plus a catch-up check when the tab becomes visible again — there's no backend push server here, so a reminder can't wake up a fully closed browser tab the way native can. Closing that gap needs Firebase Cloud Messaging + a scheduled Cloud Function; not built yet.
+- Android home-screen "Take a note" widget — tap it to jump straight into a blank note without opening the app first. (iOS doesn't have an equivalent yet — a native WidgetKit extension has to be added in Xcode, which isn't something that can be scaffolded from plain files the way the Android widget was.)
 - Archive and trash (soft delete, restore, or delete forever)
 - Search across title, body, and checklist text
 - Realtime sync via Firestore — same account, any device

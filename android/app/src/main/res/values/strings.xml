@@ -4,4 +4,5 @@
     <string name="title_activity_main">The Elite Notebook</string>
     <string name="package_name">com.eliteNotebook.app</string>
     <string name="custom_url_scheme">com.eliteNotebook.app</string>
+    <string name="widget_new_note_label">Take a note</string>
 </resources>

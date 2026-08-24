@@ -8,6 +8,7 @@ import { useLabels } from './hooks/useLabels.js'
 import { useSecurity } from './hooks/useSecurity.js'
 import { usePrefetchAttachments } from './hooks/usePrefetchAttachments.js'
 import { useInstallPrompt } from './hooks/useInstallPrompt.js'
+import { useReminderNotifications } from './hooks/useReminderNotifications.js'
 import Login from './components/Login.jsx'
 import SecurityLock from './components/SecurityLock.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -35,6 +36,10 @@ export default function App() {
   const { labels, createLabel, deleteLabel } = useLabels()
   const security = useSecurity()
   usePrefetchAttachments(security.unlocked ? notes : null)
+  useReminderNotifications(notes, (noteId) => {
+    const target = notes.find((n) => n.id === noteId)
+    if (target) setEditingNote(target)
+  })
   const install = useInstallPrompt()
   const [installBannerDismissed, setInstallBannerDismissed] = useState(
     () => localStorage.getItem('install-banner-dismissed') === '1'
@@ -117,6 +122,19 @@ export default function App() {
     if (s.view !== 'notes') { setView('notes'); return true }
     return false
   }
+
+  // Tapping the home-screen "Take a note" widget (see
+  // QuickNoteWidgetProvider.java) launches the app with a
+  // com.eliteNotebook.app://new-note deep link — jump straight to a blank
+  // note instead of just bringing the app to the foreground.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    let handle
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      if (url?.includes('new-note')) setDraft({})
+    }).then((h) => { handle = h })
+    return () => { handle?.remove() }
+  }, [])
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -218,6 +236,30 @@ export default function App() {
       }))
     })()
   }, [user])
+
+  // Tapping a reminder notification (see notificationclick in src/sw.js)
+  // reaches the app one of two ways: a `message` event if a window was
+  // already open and got focused, or a `?openNote=` URL param if the
+  // service worker had to open a fresh window. Both just open that note.
+  useEffect(() => {
+    if (!user || !notes.length) return
+    function openNoteById(noteId) {
+      const target = notes.find((n) => n.id === noteId)
+      if (target) setEditingNote(target)
+    }
+    function onMessage(event) {
+      if (event.data?.type === 'open-note') openNoteById(event.data.noteId)
+    }
+    navigator.serviceWorker?.addEventListener('message', onMessage)
+
+    const params = new URLSearchParams(window.location.search)
+    const openNoteId = params.get('openNote')
+    if (openNoteId) {
+      window.history.replaceState({}, '', window.location.pathname)
+      openNoteById(openNoteId)
+    }
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage)
+  }, [user, notes])
 
   const filtered = useMemo(() => {
     let list = notes

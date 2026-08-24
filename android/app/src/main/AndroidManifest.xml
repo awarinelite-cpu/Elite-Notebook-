@@ -23,7 +23,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link target for the home-screen "Take a note" widget
+                 (see QuickNoteWidgetProvider) — opens a blank note instead
+                 of just bringing the app to the foreground. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/custom_url_scheme" android:host="new-note" />
+            </intent-filter>
+
         </activity>
+
+        <receiver
+            android:name=".QuickNoteWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_new_note_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_note_widget_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

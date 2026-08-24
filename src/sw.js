@@ -69,6 +69,29 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
+// Reminder notifications (see src/lib/notifications.js) are shown via this
+// service worker's registration so they still appear when the tab isn't
+// focused. Tapping one should jump straight to that note — same pattern as
+// the share target above: redirect to a URL the app recognizes, this time
+// carrying the note id instead of a mailbox flag.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const noteId = event.notification.data?.noteId
+  if (!noteId) return
+  event.waitUntil(
+    (async () => {
+      const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const existing = clientsList[0]
+      if (existing) {
+        existing.postMessage({ type: 'open-note', noteId })
+        existing.focus()
+      } else {
+        self.clients.openWindow(`/?openNote=${encodeURIComponent(noteId)}`)
+      }
+    })()
+  )
+})
+
 async function handleShareTarget(event) {
   try {
     const formData = await event.request.formData()
