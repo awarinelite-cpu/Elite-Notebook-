@@ -362,8 +362,23 @@ a {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   z-index: 60;
   max-width: 90vw;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.toast-message {
   cursor: pointer;
+  flex: 1;
+}
+.toast-action {
+  background: none;
+  border: none;
+  color: #8ab4f8;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* ---------- Note grid ---------- */
@@ -399,6 +414,46 @@ a {
   box-shadow: none;
   transition: box-shadow 0.15s ease;
   background: var(--card-default);
+  touch-action: pan-y;
+}
+
+/* ---------- Swipe-to-archive / swipe-to-trash ---------- */
+.note-card-swipe-wrapper {
+  position: relative;
+  break-inside: avoid;
+}
+.note-card-swipe-wrapper .note-card {
+  margin-bottom: 0;
+  position: relative;
+  z-index: 1;
+}
+.note-card-swipe-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #1565c0;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.note-card-swipe-bg-right {
+  justify-content: flex-start;
+}
+.note-card-swipe-bg-left {
+  justify-content: flex-end;
+  background: #c62828;
+}
+.note-card-swipe-bg-destructive {
+  background: #8e0000;
+}
+.note-card-swipe-bg-committed {
+  opacity: 1;
 }
 
 .note-card:hover {

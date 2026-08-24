@@ -51,7 +51,7 @@ export default function App() {
   const [editingNote, setEditingNote] = useState(null)
   const [draft, setDraft] = useState(null) // { initial } when creating, or null
   const [activeTool, setActiveTool] = useState(null) // 'drawing' | 'audio' | null
-  const [toast, setToast] = useState(null)
+  const [toast, setToastRaw] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkSharing, setBulkSharing] = useState(false)
   // Whichever NoteEditorModal is currently mounted (editingNote or draft —
@@ -62,9 +62,15 @@ export default function App() {
   const drivePanelRef = useRef(null)
   const selectMode = selectedIds.size > 0
 
+  // Accepts either a plain string (existing call sites) or
+  // { message, actionLabel, onAction } for a toast with an Undo-style button.
+  function setToast(next) {
+    setToastRaw(typeof next === 'string' || next === null ? { message: next } : next)
+  }
+
   useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), 5000)
+    if (!toast?.message) return
+    const t = setTimeout(() => setToastRaw(null), 5000)
     return () => clearTimeout(t)
   }, [toast])
 
@@ -243,13 +249,29 @@ export default function App() {
     updateNote(note.id, { pinned: !note.pinned })
   }
   function toggleArchive(note) {
-    updateNote(note.id, { archived: !note.archived })
+    const wasArchived = note.archived
+    updateNote(note.id, { archived: !wasArchived })
+    setToast({
+      message: wasArchived ? 'Unarchived' : 'Archived',
+      actionLabel: 'Undo',
+      onAction: () => updateNote(note.id, { archived: wasArchived }),
+    })
   }
   function trash(note) {
     updateNote(note.id, { trashed: true, archived: false })
+    setToast({
+      message: 'Moved to trash',
+      actionLabel: 'Undo',
+      onAction: () => updateNote(note.id, { trashed: false, archived: note.archived }),
+    })
   }
   function restore(note) {
     updateNote(note.id, { trashed: false })
+    setToast({
+      message: 'Restored',
+      actionLabel: 'Undo',
+      onAction: () => updateNote(note.id, { trashed: true }),
+    })
   }
   function toggleChecklistItem(note, itemId) {
     const next = note.checklist.map((c) => (c.id === itemId ? { ...c, done: !c.done } : c))
@@ -478,7 +500,7 @@ export default function App() {
         <AudioRecorder onCancel={() => setActiveTool(null)} onSave={handleAudioSave} />
       )}
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast?.message} actionLabel={toast?.actionLabel} onAction={toast?.onAction} onClose={() => setToastRaw(null)} />
 
       {editingNote && (
         <NoteEditorModal

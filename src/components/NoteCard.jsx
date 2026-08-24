@@ -38,10 +38,34 @@ export default function NoteCard({
   const longPressTimer = useRef(null)
   const longPressFired = useRef(false)
   const touchMoved = useRef(false)
+  const hadSwipe = useRef(false)
 
   const LONG_PRESS_MS = 450
   const MOVE_TOLERANCE = 10
   const touchStartPos = useRef({ x: 0, y: 0 })
+
+  // --- Swipe actions ---
+  // Right swipe = reversible "positive" action (archive / restore).
+  // Left swipe = trash, or in the trash view itself, permanent delete
+  // (given a bigger threshold since that one can't be undone).
+  const [swipeX, setSwipeX] = useState(0)
+  const swiping = useRef(false)
+  const SWIPE_COMMIT = 88
+  const SWIPE_COMMIT_DESTRUCTIVE = 150
+  const SWIPE_CAP = 120
+
+  function getSwipeActions() {
+    if (view === 'trash') {
+      return {
+        right: { icon: IconRestore, label: 'Restore', run: () => onRestore(note), threshold: SWIPE_COMMIT },
+        left: { icon: IconTrash, label: 'Delete forever', run: () => onDeleteForever(note.id), threshold: SWIPE_COMMIT_DESTRUCTIVE, destructive: true },
+      }
+    }
+    return {
+      right: { icon: IconArchive, label: note.archived ? 'Unarchive' : 'Archive', run: () => onArchive(note), threshold: SWIPE_COMMIT },
+      left: { icon: IconTrash, label: 'Trash', run: () => onTrash(note), threshold: SWIPE_COMMIT },
+    }
+  }
 
   function clearLongPressTimer() {
     if (longPressTimer.current) {
@@ -53,6 +77,7 @@ export default function NoteCard({
   function handleTouchStart(e) {
     touchMoved.current = false
     longPressFired.current = false
+    hadSwipe.current = false
     const touch = e.touches?.[0]
     if (touch) touchStartPos.current = { x: touch.clientX, y: touch.clientY }
     clearLongPressTimer()
@@ -69,25 +94,50 @@ export default function NoteCard({
 
   function handleTouchMove(e) {
     const touch = e.touches?.[0]
-    if (touch) {
-      const dx = touch.clientX - touchStartPos.current.x
-      const dy = touch.clientY - touchStartPos.current.y
-      if (Math.sqrt(dx * dx + dy * dy) > MOVE_TOLERANCE) {
-        touchMoved.current = true
-        clearLongPressTimer()
-      }
+    if (!touch) return
+    const dx = touch.clientX - touchStartPos.current.x
+    const dy = touch.clientY - touchStartPos.current.y
+    if (Math.sqrt(dx * dx + dy * dy) > MOVE_TOLERANCE) {
+      touchMoved.current = true
+      clearLongPressTimer()
+    }
+    // Selection mode has its own tap-to-toggle interaction — don't also
+    // interpret drags as swipes there. Same once a long press has already
+    // fired for this touch.
+    if (selectMode || longPressFired.current) return
+    const horizontalDominant = Math.abs(dx) > Math.abs(dy) * 1.3
+    if (horizontalDominant && Math.abs(dx) > 8) {
+      swiping.current = true
+      hadSwipe.current = true
+      // Rubber-band past the cap instead of a hard stop, so a big swipe
+      // still feels responsive without the card flying off under the finger.
+      const over = Math.max(0, Math.abs(dx) - SWIPE_CAP)
+      const capped = Math.sign(dx) * (Math.min(Math.abs(dx), SWIPE_CAP) + over * 0.25)
+      setSwipeX(capped)
     }
   }
 
   function handleTouchEnd() {
     clearLongPressTimer()
+    if (swiping.current) {
+      swiping.current = false
+      const actions = getSwipeActions()
+      const action = swipeX > 0 ? actions.right : swipeX < 0 ? actions.left : null
+      if (action && Math.abs(swipeX) > action.threshold) action.run()
+      setSwipeX(0)
+    }
   }
 
   function handleCardClick() {
-    // A long press already put us into selection mode: swallow this tap
-    // instead of also opening the editor.
+    // A long press already put us into selection mode, or this tap was
+    // actually the tail end of a swipe: swallow it instead of opening the
+    // editor too.
     if (longPressFired.current) {
       longPressFired.current = false
+      return
+    }
+    if (hadSwipe.current) {
+      hadSwipe.current = false
       return
     }
     if (selectMode) {
@@ -167,8 +217,21 @@ export default function NoteCard({
     clearLongPressTimer()
   }
 
+  const swipeActions = getSwipeActions()
+  const activeSwipeAction = swipeX > 0 ? swipeActions.right : swipeX < 0 ? swipeActions.left : null
+  const swipeCommitted = activeSwipeAction && Math.abs(swipeX) > activeSwipeAction.threshold
+
   return (
     <>
+    <div className="note-card-swipe-wrapper">
+      {swipeX !== 0 && activeSwipeAction && (
+        <div
+          className={`note-card-swipe-bg ${swipeX > 0 ? 'note-card-swipe-bg-right' : 'note-card-swipe-bg-left'} ${activeSwipeAction.destructive ? 'note-card-swipe-bg-destructive' : ''} ${swipeCommitted ? 'note-card-swipe-bg-committed' : ''}`}
+        >
+          <activeSwipeAction.icon width="20" height="20" />
+          <span>{activeSwipeAction.label}</span>
+        </div>
+      )}
     <div
       ref={cardRef}
       className={`note-card ${selected ? 'note-card-selected' : ''}`}
@@ -177,6 +240,8 @@ export default function NoteCard({
           note.background && note.background !== 'none'
             ? NOTE_BACKGROUNDS[note.background]
             : NOTE_COLORS[note.color] || NOTE_COLORS.default,
+        transform: swipeX ? `translateX(${swipeX}px)` : undefined,
+        transition: swiping.current ? 'box-shadow 0.15s ease' : 'box-shadow 0.15s ease, transform 0.2s ease',
       }}
       onClick={handleCardClick}
       onTouchStart={handleTouchStart}
@@ -321,6 +386,7 @@ export default function NoteCard({
           )}
         </div>
       )}
+    </div>
     </div>
 
     {lightboxIndex !== null && (
