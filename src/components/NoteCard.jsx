@@ -271,7 +271,7 @@ export default function NoteCard({
       {note.title && <h3>{note.title}</h3>}
 
       {images.length === 1 && (
-        <div className="note-card-image-wrap">
+        <div className={`note-card-image-wrap ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}>
           <img
             src={images[0]}
             alt=""
@@ -287,7 +287,7 @@ export default function NoteCard({
 
       {images.length > 1 && (
         <div
-          className={`note-card-collage collage-${Math.min(images.length, 6)}`}
+          className={`note-card-collage collage-${Math.min(images.length, 6)} ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}
           onClick={(e) => e.stopPropagation()}
         >
           {images.slice(0, 6).map((src, i) => (

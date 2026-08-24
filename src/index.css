@@ -518,10 +518,19 @@ a {
 
 .note-card img {
   width: calc(100% + 28px);
-  margin: -14px -14px 8px;
-  border-radius: 14px 14px 0 0;
+  margin: 0 -14px 8px;
+  border-radius: 14px;
   display: block;
   max-width: none;
+}
+
+/* Only pull an image up to bleed flush with the card's top edge when
+   nothing (title, reminder tag) sits above it — otherwise the negative
+   top margin drags the image up over that text instead of just its sides. */
+.note-card-media-bleed img,
+.note-card-collage.note-card-media-bleed {
+  margin-top: -14px;
+  border-radius: 14px 14px 0 0;
 }
 
 .checklist-item {
@@ -1969,8 +1978,8 @@ a {
   display: grid;
   gap: 3px;
   width: calc(100% + 28px);
-  margin: -14px -14px 8px;
-  border-radius: 14px 14px 0 0;
+  margin: 0 -14px 8px;
+  border-radius: 14px;
   overflow: hidden;
 }
 
