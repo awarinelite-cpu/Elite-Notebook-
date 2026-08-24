@@ -1255,6 +1255,11 @@ a {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  /* Room to scroll the note body clear of the on-screen keyboard and the
+     bottom edge of the card — without this, a note with a large image or
+     several attachments leaves the text field pinned right at the bottom
+     with nothing to scroll it up into comfortable reach. */
+  padding-bottom: 25vh;
 }
 
 /* ---------- Cross-device conflict banner ---------- */
@@ -2173,7 +2178,7 @@ a {
 .note-editor-image-grid {
   display: grid;
   gap: 4px;
-  margin: 10px 0;
+  margin: 10px 0 20px;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -2200,13 +2205,26 @@ a {
   border-radius: 0;
 }
 
+/* A single image — often a full document/ID photo — is shown at its
+   natural aspect ratio rather than cropped square. Without a cap here a
+   tall photo can run to its full natural height and push the note body
+   almost entirely off-screen, leaving no visible tap target to start
+   typing. Capping the wrapper's height and letting the image sit inside
+   it (letterboxed on a soft background) keeps the note body reliably
+   reachable without an extra scroll, while a tap still opens the full
+   image in the lightbox. */
 .note-editor-image-grid.grid-1 .thumb-wrap {
   aspect-ratio: auto;
+  max-height: 42vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-soft);
 }
 
 .note-editor-image-grid.grid-1 .thumb-wrap img {
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
 }
 
