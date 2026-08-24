@@ -1,7 +1,7 @@
 import NoteCard from './NoteCard.jsx'
 import EmptyState from './EmptyState.jsx'
 
-export default function NoteGrid({ notes, labels, view, listView, selectMode, selectedIds, onToggleSelect, onLongPressSelect, ...actions }) {
+export default function NoteGrid({ notes, labels, view, listView, selectMode, selectedIds, onToggleSelect, onLongPressSelect, editingNoteId, ...actions }) {
   if (notes.length === 0) {
     return <EmptyState view={view} />
   }
@@ -28,6 +28,7 @@ export default function NoteGrid({ notes, labels, view, listView, selectMode, se
                 selected={selectedIds?.has(note.id)}
                 onToggleSelect={onToggleSelect}
                 onLongPressSelect={onLongPressSelect}
+                hidden={note.id === editingNoteId}
                 {...actions}
               />
             ))}
@@ -48,6 +49,7 @@ export default function NoteGrid({ notes, labels, view, listView, selectMode, se
             selected={selectedIds?.has(note.id)}
             onToggleSelect={onToggleSelect}
             onLongPressSelect={onLongPressSelect}
+            hidden={note.id === editingNoteId}
             {...actions}
           />
         ))}

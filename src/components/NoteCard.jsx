@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare, IconCheck, IconText } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
@@ -25,6 +26,7 @@ export default function NoteCard({
   selected,
   onToggleSelect,
   onLongPressSelect,
+  hidden,
 }) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
@@ -232,7 +234,8 @@ export default function NoteCard({
           <span>{activeSwipeAction.label}</span>
         </div>
       )}
-    <div
+    <motion.div
+      layoutId={`note-${note.id}`}
       ref={cardRef}
       className={`note-card ${selected ? 'note-card-selected' : ''}`}
       style={{
@@ -240,9 +243,14 @@ export default function NoteCard({
           note.background && note.background !== 'none'
             ? NOTE_BACKGROUNDS[note.background]
             : NOTE_COLORS[note.color] || NOTE_COLORS.default,
-        transform: swipeX ? `translateX(${swipeX}px)` : undefined,
-        transition: swiping.current ? 'box-shadow 0.15s ease' : 'box-shadow 0.15s ease, transform 0.2s ease',
+        // x (not a raw transform string) so this composes with framer's own
+        // layout-projection transform instead of clobbering it.
+        x: swipeX,
+        pointerEvents: hidden ? 'none' : undefined,
+        transition: swiping.current ? 'box-shadow 0.15s ease' : 'box-shadow 0.15s ease',
       }}
+      animate={{ opacity: hidden ? 0 : 1 }}
+      transition={{ opacity: { duration: 0.15 }, layout: { type: 'spring', stiffness: 500, damping: 42, mass: 0.9 } }}
       onClick={handleCardClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -386,7 +394,7 @@ export default function NoteCard({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
     </div>
 
     {lightboxIndex !== null && (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { useAuth } from './context/AuthContext.jsx'
@@ -478,6 +479,7 @@ export default function App() {
             view={view}
             listView={listView}
             onEdit={setEditingNote}
+            editingNoteId={editingNote?.id}
             onTogglePin={togglePin}
             onArchive={toggleArchive}
             onTrash={trash}
@@ -503,37 +505,40 @@ export default function App() {
 
       <Toast message={toast?.message} actionLabel={toast?.actionLabel} onAction={toast?.onAction} onClose={() => setToastRaw(null)} />
 
-      {editingNote && (
-        <NoteEditorModal
-          ref={noteEditorRef}
-          key={editingNote.id}
-          note={editingNote}
-          liveNote={notes.find((n) => n.id === editingNote.id) || editingNote}
-          labels={labels}
-          onClose={() => setEditingNote(null)}
-          onSave={updateNote}
-          onDeleteForever={deleteNoteForever}
-          onUploadImage={uploadImage}
-          onUploadError={(msg) => setToast(msg ? `Upload failed: ${msg}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
-          onToast={(msg) => setToast(msg)}
-        />
-      )}
+      <AnimatePresence>
+        {editingNote && (
+          <NoteEditorModal
+            ref={noteEditorRef}
+            key={editingNote.id}
+            note={editingNote}
+            liveNote={notes.find((n) => n.id === editingNote.id) || editingNote}
+            labels={labels}
+            onClose={() => setEditingNote(null)}
+            onSave={updateNote}
+            onDeleteForever={deleteNoteForever}
+            onUploadImage={uploadImage}
+            onUploadError={(msg) => setToast(msg ? `Upload failed: ${msg}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+            onToast={(msg) => setToast(msg)}
+          />
+        )}
 
-      {draft && (
-        <NoteEditorModal
-          ref={noteEditorRef}
-          note={null}
-          initial={draft}
-          labels={labels}
-          onClose={() => setDraft(null)}
-          onCreate={createNote}
-          onSave={updateNote}
-          onDeleteForever={deleteNoteForever}
-          onUploadImage={uploadImage}
-          onUploadError={(msg) => setToast(msg ? `Upload failed: ${msg}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
-          onToast={(msg) => setToast(msg)}
-        />
-      )}
+        {draft && (
+          <NoteEditorModal
+            ref={noteEditorRef}
+            key="draft"
+            note={null}
+            initial={draft}
+            labels={labels}
+            onClose={() => setDraft(null)}
+            onCreate={createNote}
+            onSave={updateNote}
+            onDeleteForever={deleteNoteForever}
+            onUploadImage={uploadImage}
+            onUploadError={(msg) => setToast(msg ? `Upload failed: ${msg}` : "Couldn't upload that image — check Firebase Storage is set up and its rules are published.")}
+            onToast={(msg) => setToast(msg)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import jsPDF from 'jspdf'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
 import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare, IconRestore } from './Icons.jsx'
@@ -692,11 +693,27 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
   }
 
   return (
-    <div className="modal-backdrop" onClick={handleClose}>
-      <div
+    <motion.div
+      className="modal-backdrop"
+      onClick={handleClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+    >
+      <motion.div
+        layoutId={note?.id ? `note-${note.id}` : undefined}
         className="modal-card"
         style={{ background: background === 'none' ? NOTE_COLORS[color] : undefined }}
         onClick={(e) => e.stopPropagation()}
+        initial={note?.id ? false : { opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={note?.id ? undefined : { opacity: 0, scale: 0.96 }}
+        transition={{
+          layout: { type: 'spring', stiffness: 500, damping: 42, mass: 0.9 },
+          opacity: { duration: 0.15 },
+          scale: { duration: 0.15 },
+        }}
       >
       {background !== 'none' && (
         <div className="modal-card-bg" style={{ background: NOTE_BACKGROUNDS[background] }} />
@@ -1110,7 +1127,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
           <input ref={docInput} type="file" multiple hidden onChange={handleDocFile} />
         </div>
       </div>
-      </div>
+      </motion.div>
 
       {lightboxIndex !== null && (
         <ImageLightbox
@@ -1151,7 +1168,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
           onRestore={handleRestoreVersion}
         />
       )}
-    </div>
+    </motion.div>
   )
 })
 
