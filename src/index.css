@@ -1140,6 +1140,86 @@ a {
   flex-shrink: 0;
 }
 
+/* ---------- Version history panel ---------- */
+.version-history-card {
+  z-index: 55;
+  max-width: 420px;
+}
+.version-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.version-history-header h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.version-history-empty {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 20px 4px;
+  text-align: center;
+}
+.version-history-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.version-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.version-history-item:last-child {
+  border-bottom: none;
+}
+.version-history-item-main {
+  min-width: 0;
+  flex: 1;
+}
+.version-history-time {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-bottom: 2px;
+}
+.version-history-preview {
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.version-history-restore-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.version-history-restore-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.version-history-footnote {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
 .note-editor-scroll {
   flex: 1;
   min-height: 0;

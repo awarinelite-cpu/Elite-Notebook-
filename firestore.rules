@@ -5,6 +5,13 @@ service cloud.firestore {
     match /notes/{noteId} {
       allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+
+      // Version-history snapshots don't carry their own uid — access is
+      // gated on the parent note's owner instead.
+      match /versions/{versionId} {
+        allow read, write: if request.auth != null &&
+          request.auth.uid == get(/databases/$(database)/documents/notes/$(noteId)).data.uid;
+      }
     }
 
     match /labels/{labelId} {

@@ -13,6 +13,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { deleteAllVersions } from '../lib/versions.js'
 
 function sortNotes(list) {
   return [...list].sort((a, b) => {
@@ -118,6 +119,7 @@ export function useNotes() {
   async function deleteNoteForever(id) {
     try {
       await deleteDoc(doc(db, 'notes', id))
+      deleteAllVersions(id) // best-effort, not awaited — subcollection cleanup shouldn't block the delete
     } catch (err) {
       console.error('deleteNoteForever failed:', err)
       setError(err.message)

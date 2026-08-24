@@ -1,13 +1,15 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare, IconRestore } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
 import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { extractTextFromImages } from '../lib/ocr.js'
+import { saveVersionIfChanged, snapshotOf } from '../lib/versions.js'
+import VersionHistoryPanel from './VersionHistoryPanel.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
 
@@ -68,6 +70,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
   // falls back to closing the whole note. Ordered innermost-first.
   useImperativeHandle(ref, () => ({
     handleBack() {
+      if (showHistory) { setShowHistory(false); return true }
       if (editingImage !== null) { setEditingImage(null); return true }
       if (subTool) { setSubTool(null); return true }
       if (lightboxIndex !== null) { setLightboxIndex(null); return true }
@@ -90,6 +93,16 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
   const currentId = note?.id || createdId
   const skipFirstAutosave = useRef(true)
   const creatingRef = useRef(false)
+  const [showHistory, setShowHistory] = useState(false)
+  // Version-history bookkeeping: sessionBaselineRef holds the content as of
+  // the last checkpoint (starts as the note's state when the editor opened),
+  // and a checkpoint is only written to Firestore once per session, then
+  // again at most every 10 minutes for a session that stays open a long
+  // time — not on every 600ms autosave tick, which would spam a version
+  // per pause-to-think while typing.
+  const sessionBaselineRef = useRef(!isNew ? snapshotOf(base) : null)
+  const lastVersionSavedAtRef = useRef(0)
+  const CHECKPOINT_INTERVAL_MS = 10 * 60 * 1000
   const fileInput = useRef(null)
   const docInput = useRef(null)
   const textEditorRef = useRef(null)
@@ -146,6 +159,20 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     )
   }
 
+  // Writes a version checkpoint (the content as it was before this session's
+  // edits) the first time this session actually changes something, and at
+  // most once every CHECKPOINT_INTERVAL_MS after that for long sessions —
+  // not on every autosave tick.
+  async function maybeCheckpointVersion(patch) {
+    if (isNew || !currentId || !sessionBaselineRef.current) return
+    const now = Date.now()
+    if (lastVersionSavedAtRef.current && now - lastVersionSavedAtRef.current < CHECKPOINT_INTERVAL_MS) return
+    const baseline = sessionBaselineRef.current
+    await saveVersionIfChanged(currentId, baseline, patch)
+    sessionBaselineRef.current = patch
+    lastVersionSavedAtRef.current = now
+  }
+
   // Autosave: any change to the note's content persists a few hundred ms
   // after the user stops typing, so leaving the editor (backdrop click, back
   // button, switching apps) never loses an edit. A brand-new note only gets
@@ -162,6 +189,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     const t = setTimeout(async () => {
       if (currentId) {
         onSave(currentId, patch)
+        maybeCheckpointVersion(patch)
       } else if (isNew && !creatingRef.current) {
         creatingRef.current = true
         const id = await onCreate(patch)
@@ -360,6 +388,26 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     })
     const failed = results.find((r) => !r.url)
     if (failed) onUploadError?.(failed.error)
+  }
+
+  // Restoring a version snapshots the current (pre-restore) content first,
+  // bypassing the normal checkpoint timer, so undoing a restore is always
+  // possible too — not just the original edit.
+  async function handleRestoreVersion(version) {
+    if (currentId) {
+      await saveVersionIfChanged(currentId, sessionBaselineRef.current || snapshotOf(buildPatch()), buildPatch())
+    }
+    setTitle(version.title || '')
+    setText(version.text || '')
+    setChecklist(version.checklist || [])
+    setIsChecklist((version.checklist || []).length > 0)
+    setImages(version.images || [])
+    setAudioClips(version.audio || [])
+    setAttachments(version.files || [])
+    sessionBaselineRef.current = snapshotOf(version)
+    lastVersionSavedAtRef.current = Date.now()
+    setShowHistory(false)
+    onToast?.('Version restored')
   }
 
   function handleDocFile(e) {
@@ -992,6 +1040,11 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
                   <IconAttachment width="17" height="17" /> Attach file
                 </button>
                 {!isNew && (
+                  <button className="more-menu-item" onClick={() => { setShowHistory(true); setShowMoreMenu(false) }}>
+                    <IconRestore width="17" height="17" /> Version history
+                  </button>
+                )}
+                {!isNew && (
                   <button className="more-menu-item" onClick={() => { onDeleteForever(note.id); onClose() }}>
                     <IconTrash width="17" height="17" /> Delete forever
                   </button>
@@ -1034,6 +1087,14 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       )}
       {subTool === 'audio' && (
         <AudioRecorder onCancel={() => setSubTool(null)} onSave={handleAudioSave} />
+      )}
+
+      {showHistory && (
+        <VersionHistoryPanel
+          noteId={currentId}
+          onClose={() => setShowHistory(false)}
+          onRestore={handleRestoreVersion}
+        />
       )}
     </div>
   )
