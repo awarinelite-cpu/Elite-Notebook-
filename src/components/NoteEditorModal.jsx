@@ -114,6 +114,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
   const fileInput = useRef(null)
   const docInput = useRef(null)
   const textEditorRef = useRef(null)
+  const modalCardRef = useRef(null)
   const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false, ul: false, ol: false })
   const uploading = images.some(isUploading)
   const audioUploading = audioClips.some(isUploading)
@@ -247,6 +248,29 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, text, checklist, color, background, selectedLabels, images, ocrText, audioClips, attachments, reminderAt, pinned, archived])
+
+  // Keep whatever field the person just tapped into visible once the
+  // on-screen keyboard opens. The native Keyboard plugin (resize: 'body')
+  // shrinks the viewport so the modal's own scroll area can reach the
+  // field at all, but the keyboard's show animation still takes a beat to
+  // settle — this nudges the focused field into view shortly after focus
+  // instead of leaving it to whatever position it happened to be in
+  // before the keyboard opened. A single delegated listener covers the
+  // title input, the rich-text body, and every checklist row without
+  // needing a handler wired to each one individually.
+  useEffect(() => {
+    const container = modalCardRef.current
+    if (!container) return
+    function handleFocusIn(e) {
+      const target = e.target
+      if (!target.matches?.('input, textarea, [contenteditable="true"]')) return
+      setTimeout(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+    container.addEventListener('focusin', handleFocusIn)
+    return () => container.removeEventListener('focusin', handleFocusIn)
+  }, [])
 
   function handleClose() {
     const patch = buildPatch()
@@ -702,6 +726,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
       transition={{ duration: 0.18 }}
     >
       <motion.div
+        ref={modalCardRef}
         layoutId={note?.id ? `note-${note.id}` : undefined}
         className="modal-card"
         style={{ background: background === 'none' ? NOTE_COLORS[color] : undefined }}
