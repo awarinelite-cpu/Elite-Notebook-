@@ -28,6 +28,22 @@ export function useNotes() {
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // 'synced' | 'syncing' | 'offline' — derived from the notes listener's
+  // snapshot metadata (hasPendingWrites / fromCache) plus the browser's own
+  // online/offline events, which fire faster than Firestore notices a
+  // dropped connection.
+  const [syncStatus, setSyncStatus] = useState(navigator.onLine ? 'synced' : 'offline')
+
+  useEffect(() => {
+    function goOffline() { setSyncStatus('offline') }
+    function goOnline() { setSyncStatus((s) => (s === 'offline' ? 'syncing' : s)) }
+    window.addEventListener('offline', goOffline)
+    window.addEventListener('online', goOnline)
+    return () => {
+      window.removeEventListener('offline', goOffline)
+      window.removeEventListener('online', goOnline)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -41,10 +57,15 @@ export function useNotes() {
     const q = query(collection(db, 'notes'), where('uid', '==', user.uid))
     const unsub = onSnapshot(
       q,
+      { includeMetadataChanges: true },
       (snap) => {
         setNotes(sortNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
         setLoading(false)
         setError(null)
+        if (!navigator.onLine) setSyncStatus('offline')
+        else if (snap.metadata.hasPendingWrites) setSyncStatus('syncing')
+        else if (snap.metadata.fromCache) setSyncStatus('offline')
+        else setSyncStatus('synced')
       },
       (err) => {
         console.error('Notes listener error:', err)
@@ -120,5 +141,5 @@ export function useNotes() {
     }
   }
 
-  return { notes, loading, error, createNote, updateNote, deleteNoteForever, uploadImage }
+  return { notes, loading, error, syncStatus, createNote, updateNote, deleteNoteForever, uploadImage }
 }

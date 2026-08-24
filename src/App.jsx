@@ -30,7 +30,7 @@ const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive', 'keep-import']
 
 export default function App() {
   const { user, loading } = useAuth()
-  const { notes, error, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
+  const { notes, error, syncStatus, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
   const { labels, createLabel, deleteLabel } = useLabels()
   const security = useSecurity()
   usePrefetchAttachments(security.unlocked ? notes : null)
@@ -436,6 +436,7 @@ export default function App() {
           sortAsc={sortAsc}
           setSortAsc={setSortAsc}
           onDriveClick={() => setView('drive')}
+          syncStatus={syncStatus}
         />
       )}
 

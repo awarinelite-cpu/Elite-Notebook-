@@ -2,7 +2,22 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { IconMenu, IconSearch, IconGrid, IconList, IconSort, IconMoon, IconSun, IconDrive } from './Icons.jsx'
 
-export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc, onDriveClick }) {
+const SYNC_STATUS_LABEL = {
+  synced: 'All changes saved',
+  syncing: 'Saving…',
+  offline: "Offline — changes will sync when you're back online",
+}
+
+function SyncStatus({ status }) {
+  return (
+    <div className={`sync-status sync-status-${status}`} title={SYNC_STATUS_LABEL[status]}>
+      <span className="sync-status-dot" />
+      {status !== 'synced' && <span className="sync-status-label">{status === 'syncing' ? 'Saving…' : 'Offline'}</span>}
+    </div>
+  )
+}
+
+export default function TopBar({ search, setSearch, onMenuClick, listView, setListView, sortAsc, setSortAsc, onDriveClick, syncStatus }) {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const initial = (user?.displayName || user?.email || '?').charAt(0).toUpperCase()
@@ -24,6 +39,7 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
       </div>
 
       <div className="topbar-icons">
+        {syncStatus && <SyncStatus status={syncStatus} />}
         <button
           className="icon-toggle-btn"
           title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}

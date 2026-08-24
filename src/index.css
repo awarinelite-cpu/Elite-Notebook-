@@ -167,6 +167,38 @@ a {
   flex-shrink: 0;
 }
 
+/* ---------- Sync status indicator ---------- */
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+.sync-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34a853;
+  flex-shrink: 0;
+}
+.sync-status-syncing .sync-status-dot {
+  background: #f9ab00;
+  animation: sync-status-pulse 1s ease-in-out infinite;
+}
+.sync-status-offline .sync-status-dot {
+  background: #9aa0a6;
+}
+.sync-status-label {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+@keyframes sync-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 .icon-toggle-btn {
   width: 40px;
   height: 40px;
