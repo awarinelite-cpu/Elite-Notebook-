@@ -20,7 +20,7 @@ const rowStyle = {
 
 export default function SettingsPanel({ security }) {
   const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const install = useInstallPrompt()
   const [pinModal, setPinModal] = useState(null) // 'setup' | 'change' | 'remove' | null
   const [bioBusy, setBioBusy] = useState(false)
@@ -72,24 +72,37 @@ export default function SettingsPanel({ security }) {
         </div>
       </div>
 
-      <button
-        onClick={toggleTheme}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          width: '100%',
-          padding: '12px 16px',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          fontSize: 14,
-          marginBottom: 10,
-        }}
-      >
-        {theme === 'dark' ? <IconSun /> : <IconMoon />}
-        {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-      </button>
+      <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+        <div style={{ fontSize: 13, color: 'var(--ink-soft)', padding: '0 2px' }}>Theme</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[
+            { id: 'light', label: 'Light', icon: <IconSun width="16" height="16" /> },
+            { id: 'dark', label: 'Dark', icon: <IconMoon width="16" height="16" /> },
+            { id: 'oled', label: 'OLED black', icon: <IconMoon width="16" height="16" /> },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setTheme(opt.id)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                padding: '10px 6px',
+                background: theme === opt.id ? 'var(--surface-soft)' : 'transparent',
+                border: `1px solid ${theme === opt.id ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 8,
+                fontSize: 12,
+                color: 'var(--ink)',
+              }}
+            >
+              {opt.icon}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {!install.standalone && install.canPromptInstall && (
         <button style={rowStyle} onClick={install.promptInstall}>

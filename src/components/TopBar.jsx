@@ -42,10 +42,10 @@ export default function TopBar({ search, setSearch, onMenuClick, listView, setLi
         {syncStatus && <SyncStatus status={syncStatus} />}
         <button
           className="icon-toggle-btn"
-          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
           onClick={toggleTheme}
         >
-          {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          {theme === 'light' ? <IconMoon /> : <IconSun />}
         </button>
         <button
           className="icon-toggle-btn"

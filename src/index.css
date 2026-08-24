@@ -50,6 +50,35 @@
   --card-clay: #3D3527;
 }
 
+/* True black — every surface a real note-taking screen shows most of the
+   time (bg, cards, modal) drops to #000 so OLED panels can switch those
+   pixels off entirely. Borders get a hair brighter than the dark theme's
+   so cards still read as distinct edges against pure black instead of
+   melting into it. */
+[data-theme="oled"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-soft: #0D0D0F;
+  --ink: #E8EAED;
+  --ink-soft: #9AA0A6;
+  --border: #2A2A2D;
+  --accent: #FDD663;
+  --fab: #1A2433;
+  --fab-icon: #8AB4F8;
+  --shadow: rgba(0, 0, 0, 0.7);
+
+  --card-default: #000000;
+  --card-coral: #431F1D;
+  --card-peach: #392913;
+  --card-sand: #37331A;
+  --card-sage: #26331C;
+  --card-fog: #10322C;
+  --card-storm: #172B44;
+  --card-dusk: #2B2036;
+  --card-blossom: #391D2A;
+  --card-clay: #2D271D;
+}
+
 * {
   box-sizing: border-box;
 }

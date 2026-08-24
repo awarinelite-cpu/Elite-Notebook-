@@ -24,11 +24,29 @@ export const NOTE_COLORS_DARK = {
   clay: '#3D3527',
 }
 
+// Same hue family as dark, but the default card drops to true black and
+// every tint gets a touch darker/desaturated so nothing reads as a washed-
+// out gray rectangle against a pure-black page.
+export const NOTE_COLORS_OLED = {
+  default: '#000000',
+  coral: '#431F1D',
+  peach: '#392913',
+  sand: '#37331A',
+  sage: '#26331C',
+  fog: '#10322C',
+  storm: '#172B44',
+  dusk: '#2B2036',
+  blossom: '#391D2A',
+  clay: '#2D271D',
+}
+
 // Kept for any code that hasn't switched to getNoteColors(theme) yet.
 export const NOTE_COLORS = NOTE_COLORS_LIGHT
 
 export function getNoteColors(theme) {
-  return theme === 'dark' ? NOTE_COLORS_DARK : NOTE_COLORS_LIGHT
+  if (theme === 'oled') return NOTE_COLORS_OLED
+  if (theme === 'dark') return NOTE_COLORS_DARK
+  return NOTE_COLORS_LIGHT
 }
 
 // Wallpaper backgrounds — an alternative to flat colors. Pure CSS
