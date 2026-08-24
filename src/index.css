@@ -1228,6 +1228,48 @@ a {
   flex-direction: column;
 }
 
+/* ---------- Cross-device conflict banner ---------- */
+.conflict-banner {
+  background: #fef7e0;
+  color: #664d03;
+  border: 1px solid #f9ab00;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+[data-theme='dark'] .conflict-banner {
+  background: #4a3c0a;
+  color: #f9d97a;
+  border-color: #8a6d1a;
+}
+.conflict-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.conflict-banner-actions button {
+  flex: 1;
+  border: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.conflict-banner-actions button:first-child {
+  background: #f9ab00;
+  color: #3c2f00;
+  border-color: #f9ab00;
+}
+[data-theme='dark'] .conflict-banner-actions button:first-child {
+  color: #4a3c0a;
+}
+
 .note-editor-attachments {
   flex-shrink: 0;
 }

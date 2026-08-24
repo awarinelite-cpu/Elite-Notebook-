@@ -508,6 +508,7 @@ export default function App() {
           ref={noteEditorRef}
           key={editingNote.id}
           note={editingNote}
+          liveNote={notes.find((n) => n.id === editingNote.id) || editingNote}
           labels={labels}
           onClose={() => setEditingNote(null)}
           onSave={updateNote}

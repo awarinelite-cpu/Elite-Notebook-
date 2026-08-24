@@ -29,7 +29,7 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError, onToast }, ref) {
+const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, initial, labels, onClose, onSave, onCreate, onDeleteForever, onUploadImage, onUploadError, onToast }, ref) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
   const isNew = !note
@@ -103,6 +103,13 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
   const sessionBaselineRef = useRef(!isNew ? snapshotOf(base) : null)
   const lastVersionSavedAtRef = useRef(0)
   const CHECKPOINT_INTERVAL_MS = 10 * 60 * 1000
+
+  // Cross-device conflict detection: lastSentPatchRef holds the content this
+  // session most recently wrote. When liveNote (kept fresh by the parent's
+  // Firestore listener) changes to something that ISN'T just the echo of
+  // our own save, another device edited this note while it was open here.
+  const lastSentPatchRef = useRef(null)
+  const [conflict, setConflict] = useState(null)
   const fileInput = useRef(null)
   const docInput = useRef(null)
   const textEditorRef = useRef(null)
@@ -173,6 +180,44 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     lastVersionSavedAtRef.current = now
   }
 
+  // Cross-device conflict detection: liveNote is kept fresh by the parent
+  // from its Firestore listener even while this editor stays open. If its
+  // content changes to something other than the echo of our own last save,
+  // another device edited this note concurrently.
+  useEffect(() => {
+    if (isNew || !currentId || !liveNote || liveNote.id !== currentId) return
+    const liveSnap = snapshotOf(liveNote)
+    const expectedSnap = lastSentPatchRef.current ? snapshotOf(lastSentPatchRef.current) : snapshotOf(base)
+    if (JSON.stringify(liveSnap) !== JSON.stringify(expectedSnap)) {
+      setConflict(liveNote)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveNote])
+
+  function acceptRemoteVersion() {
+    const remote = conflict
+    setConflict(null)
+    if (!remote) return
+    setTitle(remote.title || '')
+    setText(remote.text || '')
+    setChecklist(remote.checklist || [])
+    setIsChecklist((remote.checklist || []).length > 0)
+    setImages(remote.images || [])
+    setAudioClips(remote.audio || [])
+    setAttachments(remote.files || [])
+    const snap = snapshotOf(remote)
+    sessionBaselineRef.current = snap
+    lastSentPatchRef.current = snap
+  }
+
+  function keepLocalVersion() {
+    // Not a real merge — just dismiss. The next autosave (of whatever's on
+    // screen here) overwrites the remote change; the effect above only
+    // re-fires if liveNote changes again, so this won't nag repeatedly for
+    // the same conflict.
+    setConflict(null)
+  }
+
   // Autosave: any change to the note's content persists a few hundred ms
   // after the user stops typing, so leaving the editor (backdrop click, back
   // button, switching apps) never loses an edit. A brand-new note only gets
@@ -189,6 +234,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
     const t = setTimeout(async () => {
       if (currentId) {
         onSave(currentId, patch)
+        lastSentPatchRef.current = patch
         maybeCheckpointVersion(patch)
       } else if (isNew && !creatingRef.current) {
         creatingRef.current = true
@@ -788,6 +834,15 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, initial, lab
       </div>
 
       <div className="note-editor-scroll">
+        {conflict && (
+          <div className="conflict-banner">
+            <span>This note was edited on another device while you had it open.</span>
+            <div className="conflict-banner-actions">
+              <button onClick={acceptRemoteVersion}>Use their version</button>
+              <button onClick={keepLocalVersion}>Keep mine</button>
+            </div>
+          </div>
+        )}
         {(images.length > 0 || audioClips.length > 0 || attachments.length > 0) && (
           <div className="note-editor-attachments" style={{ marginTop: 0 }}>
             {images.length > 0 && (
