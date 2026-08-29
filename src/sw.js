@@ -12,11 +12,16 @@ clientsClaim()
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
-// One-time cleanup: drop the old attachments cache that may hold entries
-// cached as "successful" during the Storage billing outage (see sw.js
-// note on 'note-attachments-v2' below).
+// One-time cleanup: drop old attachment caches that may hold opaque
+// (no-cors) responses — from the Storage billing outage, and later from
+// thumbnails/lightbox loading images without crossOrigin set before the
+// editor's canvas needed a real cors-mode response for the same URL (see
+// 'note-attachments-v3' below).
 self.addEventListener('activate', (event) => {
-  event.waitUntil(caches.delete('note-attachments'))
+  event.waitUntil(Promise.all([
+    caches.delete('note-attachments'),
+    caches.delete('note-attachments-v2'),
+  ]))
 })
 
 registerRoute(
@@ -35,18 +40,21 @@ registerRoute(
 registerRoute(
   ({ url }) => url.origin === 'https://firebasestorage.googleapis.com',
   new CacheFirst({
-    // Renamed from 'note-attachments' -> 'note-attachments-v2' to invalidate
-    // entries cached while Firebase Storage billing was broken: with no-cors
-    // requests every response (success or failure) comes back as an opaque
-    // status-0 response, so CacheableResponsePlugin([0,200]) had no way to
-    // tell a real image apart from a quota-exceeded failure and cached the
-    // failures as if they were good. Bumping the name orphans that bad
-    // cache and forces a clean re-fetch for every attachment.
-    cacheName: 'note-attachments-v2',
+    // Renamed 'note-attachments-v2' -> 'note-attachments-v3': every <img>
+    // that loads a note attachment now sets crossOrigin="anonymous" (see
+    // ImageLightbox.jsx and NoteEditorModal.jsx), so requests here are
+    // always 'cors' mode and get back a real, readable 200 response — never
+    // an opaque one. Before this, thumbnails loaded 'no-cors' and got
+    // cached as opaque; ImageEditor's canvas then reused that same cached
+    // opaque response for its 'cors' request, which the Fetch spec always
+    // treats as a network error, so image edit/crop reliably failed even
+    // after Storage's CORS policy was fixed server-side. Bumping the cache
+    // name orphans every old opaque entry and forces a clean re-fetch.
+    cacheName: 'note-attachments-v3',
     plugins: [
-      // <img>/<audio> requests to a cross-origin URL are made in 'no-cors'
-      // mode, so the response comes back opaque (status 0) — accept those
-      // alongside normal 200s, or workbox would refuse to cache them at all.
+      // Kept as a safety net in case any request to this origin is ever
+      // made without crossOrigin set — but the goal now is that every
+      // cached entry is a real 200, not an opaque 0.
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       // Every upload gets a unique, never-reused storage path (see
       // uploadImage in useNotes.js), so a cached copy is never stale —

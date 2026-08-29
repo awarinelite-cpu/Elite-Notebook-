@@ -40,6 +40,7 @@ export default function ImageLightbox({ images, index, onClose, onNavigate, onEd
         className="lightbox-img"
         src={images[index]}
         alt=""
+        crossOrigin="anonymous"
         onClick={(e) => e.stopPropagation()}
       />
 

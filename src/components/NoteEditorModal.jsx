@@ -909,6 +909,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
                       <img
                         src={srcOf(slot)}
                         alt=""
+                        crossOrigin="anonymous"
                         style={{
                           cursor: pending ? 'default' : 'pointer',
                           opacity: pending ? 0.6 : 1,
