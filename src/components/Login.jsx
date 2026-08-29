@@ -74,10 +74,7 @@ export default function Login() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <div className="drawer-brand">
-          <span className="brand-elite">Elite</span>
-          <span className="brand-notebook">Notebook</span>
-        </div>
+        <img src="/icon-512.png" alt="Elite Notebook" className="login-logo" />
         <p>Capture notes, checklists, and images. Link your documents in when you need them.</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
