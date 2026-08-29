@@ -14,6 +14,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { deleteAllVersions } from '../lib/versions.js'
+import { precacheAttachments } from '../lib/offlinePrecache.js'
 
 function sortNotes(list) {
   return [...list].sort((a, b) => {
@@ -60,13 +61,19 @@ export function useNotes() {
       q,
       { includeMetadataChanges: true },
       (snap) => {
-        setNotes(sortNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
+        const list = sortNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setNotes(list)
         setLoading(false)
         setError(null)
         if (!navigator.onLine) setSyncStatus('offline')
         else if (snap.metadata.hasPendingWrites) setSyncStatus('syncing')
         else if (snap.metadata.fromCache) setSyncStatus('offline')
         else setSyncStatus('synced')
+        // Text/checklist content is already offline-ready via Firestore's
+        // own persistent local cache (see firebase.js). This is what makes
+        // images/audio/file attachments offline-ready too, instead of only
+        // caching each one the first time it's viewed.
+        precacheAttachments(list)
       },
       (err) => {
         console.error('Notes listener error:', err)
