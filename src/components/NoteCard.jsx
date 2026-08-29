@@ -5,6 +5,7 @@ import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, Icon
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
+import { linkifyHtml } from '../lib/linkify.js'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -335,7 +336,13 @@ export default function NoteCard({
         </div>
       )}
 
-      {note.text && <div className="note-card-text" dangerouslySetInnerHTML={{ __html: note.text }} />}
+      {note.text && (
+        <div
+          className="note-card-text"
+          onClick={(e) => { if (e.target.tagName === 'A') e.stopPropagation() }}
+          dangerouslySetInnerHTML={{ __html: linkifyHtml(note.text) }}
+        />
+      )}
 
       {note.checklist?.length > 0 && (
         <div onClick={(e) => e.stopPropagation()}>

@@ -10,6 +10,7 @@ import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { extractTextFromImages } from '../lib/ocr.js'
 import { saveVersionIfChanged, snapshotOf } from '../lib/versions.js'
+import { linkifyHtml } from '../lib/linkify.js'
 import VersionHistoryPanel from './VersionHistoryPanel.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
@@ -135,7 +136,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
   // `text` in sync - so the caret never jumps mid-typing the way it would if
   // React re-set innerHTML on every keystroke.
   useEffect(() => {
-    if (textEditorRef.current) textEditorRef.current.innerHTML = base.text || ''
+    if (textEditorRef.current) textEditorRef.current.innerHTML = linkifyHtml(base.text || '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -329,6 +330,19 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
 
   function handleTextInput(e) {
     setText(e.currentTarget.innerHTML)
+  }
+
+  // Runs once typing stops (focus leaves the note body) rather than on
+  // every keystroke — rewriting DOM nodes while the caret is mid-word would
+  // fight the browser's own cursor placement. By blur time nothing is
+  // being typed into, so replacing the raw URL text with an <a> is safe.
+  function handleTextBlur() {
+    if (!textEditorRef.current) return
+    const linked = linkifyHtml(textEditorRef.current.innerHTML)
+    if (linked !== textEditorRef.current.innerHTML) {
+      textEditorRef.current.innerHTML = linked
+      setText(linked)
+    }
   }
 
   function undoRedo(command) {
@@ -1007,9 +1021,20 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
             contentEditable
             suppressContentEditableWarning
             onInput={handleTextInput}
+            onBlur={handleTextBlur}
             onKeyUp={refreshActiveFormats}
             onMouseUp={refreshActiveFormats}
             onFocus={refreshActiveFormats}
+            onClick={(e) => {
+              // Inside a contentEditable, a plain click on a link would just
+              // place the caret — Ctrl/Cmd-click is the usual escape hatch,
+              // but on a touchscreen there's no such modifier, so a tap on
+              // a note-link here opens it directly instead.
+              if (e.target.tagName === 'A' && e.target.classList.contains('note-link')) {
+                e.preventDefault()
+                window.open(e.target.href, '_blank', 'noopener,noreferrer')
+              }
+            }}
             data-placeholder="Take a note..."
             className="note-editor-textarea note-editor-richtext"
             style={{

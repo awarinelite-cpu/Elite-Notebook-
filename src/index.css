@@ -545,6 +545,13 @@ a {
   overflow: hidden;
 }
 
+.note-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
 .note-card img {
   width: calc(100% + 28px);
   margin: 0 -14px 8px;
