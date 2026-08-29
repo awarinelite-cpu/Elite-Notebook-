@@ -16,6 +16,7 @@ import TopBar from './components/TopBar.jsx'
 import SelectionBar from './components/SelectionBar.jsx'
 import NoteGrid from './components/NoteGrid.jsx'
 import NoteEditorModal from './components/NoteEditorModal.jsx'
+import DocumentScanner from './components/DocumentScanner.jsx'
 import LabelManager from './components/LabelManager.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import HelpPanel from './components/HelpPanel.jsx'
@@ -449,9 +450,24 @@ export default function App() {
     setDraft((d) => ({ ...(d || {}), pendingAudioFiles: [...((d && d.pendingAudioFiles) || []), file] }))
   }
 
+  // Same single-page-vs-multi-page split as the in-editor scanner: a single
+  // page behaves like a photo (pendingFiles), multiple pages arrive as one
+  // combined PDF and go through the doc-attachment pipeline (pendingDocFiles).
+  function handleScanSave(blob) {
+    const file = new File([blob], `scan-${Date.now()}.png`, { type: 'image/png' })
+    setActiveTool(null)
+    setDraft((d) => ({ ...(d || {}), pendingFiles: [...((d && d.pendingFiles) || []), file] }))
+  }
+
+  function handleScanPdfSave(blob) {
+    const file = new File([blob], `scan-${Date.now()}.pdf`, { type: 'application/pdf' })
+    setActiveTool(null)
+    setDraft((d) => ({ ...(d || {}), pendingDocFiles: [...((d && d.pendingDocFiles) || []), file] }))
+  }
+
   return (
     <div className="app-shell">
-      <Drawer open={drawerOpen} view={view} setView={setView} onClose={() => setDrawerOpen(false)} />
+      <Drawer open={drawerOpen} view={view} setView={setView} onClose={() => setDrawerOpen(false)} onScan={() => setActiveTool('scan')} />
 
       {selectMode ? (
         <SelectionBar
@@ -543,6 +559,9 @@ export default function App() {
       )}
       {activeTool === 'audio' && (
         <AudioRecorder onCancel={() => setActiveTool(null)} onSave={handleAudioSave} />
+      )}
+      {activeTool === 'scan' && (
+        <DocumentScanner onCancel={() => setActiveTool(null)} onSave={handleScanSave} onSavePdf={handleScanPdfSave} />
       )}
 
       <Toast message={toast?.message} actionLabel={toast?.actionLabel} onAction={toast?.onAction} onClose={() => setToastRaw(null)} />

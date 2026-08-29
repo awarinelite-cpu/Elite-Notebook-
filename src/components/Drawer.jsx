@@ -1,6 +1,6 @@
-import { IconBulb, IconBell, IconPlus, IconArchive, IconTrash, IconSettings, IconHelp, IconDrive, IconImport } from './Icons.jsx'
+import { IconBulb, IconBell, IconPlus, IconArchive, IconTrash, IconSettings, IconHelp, IconDrive, IconImport, IconScan } from './Icons.jsx'
 
-export default function Drawer({ open, view, setView, onClose }) {
+export default function Drawer({ open, view, setView, onClose, onScan }) {
   if (!open) return null
 
   function go(id) {
@@ -28,6 +28,10 @@ export default function Drawer({ open, view, setView, onClose }) {
         <button className="drawer-item" onClick={() => go('labels')}>
           <IconPlus className="drawer-icon-svg" />
           Create new label
+        </button>
+        <button className="drawer-item" onClick={() => { onScan?.(); onClose() }}>
+          <IconScan className="drawer-icon-svg" />
+          Scan document
         </button>
 
         <div className="drawer-gap" />
