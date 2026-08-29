@@ -90,6 +90,9 @@ export function IconAttachment(p) { return (
 export function IconFileDoc(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M14 3v4h4" /><path d="M8.5 13h7M8.5 16.5h7" /></svg>
 )}
+export function IconScan(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 1-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3" /><path d="M4 12h16" /></svg>
+)}
 export function IconMoon(p) { return (
   <svg viewBox="0 0 24 24" width="19" height="19" {...base} {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
 )}

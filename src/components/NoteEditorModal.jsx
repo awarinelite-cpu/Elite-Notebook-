@@ -2,10 +2,11 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { motion } from 'framer-motion'
 import jsPDF from 'jspdf'
 import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_LABELS } from '../constants.js'
-import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare, IconRestore } from './Icons.jsx'
+import { IconChecklist, IconImage, IconTrash, IconClose, IconDrawing, IconMic, IconAttachment, IconFileDoc, IconScan, IconBack, IconPin, IconUnpin, IconBell, IconArchive, IconWallpaper, IconMoreVert, IconBold, IconItalic, IconUnderline, IconBulletList, IconNumberedList, IconUndo, IconRedo, IconCheck, IconShare, IconRestore } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import ImageEditor from './ImageEditor.jsx'
 import DrawingCanvas from './DrawingCanvas.jsx'
+import DocumentScanner from './DocumentScanner.jsx'
 import AudioRecorder from './AudioRecorder.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { extractTextFromImages } from '../lib/ocr.js'
@@ -51,7 +52,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
   const [ocrText, setOcrText] = useState(base.imageText || {})
   const [audioClips, setAudioClips] = useState(base.audio || [])
   const [attachments, setAttachments] = useState(base.files || [])
-  const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | null
+  const [subTool, setSubTool] = useState(null) // 'drawing' | 'audio' | 'scan' | null
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [editingImage, setEditingImage] = useState(null) // index of image being edited
   // Long-press image selection, scoped to this open note (mirrors the
@@ -435,6 +436,21 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
     const file = new File([blob], `drawing-${Date.now()}.png`, { type: 'image/png' })
     setSubTool(null)
     uploadFiles([file])
+  }
+
+  // A single scanned page behaves exactly like a photo. Multiple pages
+  // arrive already combined into one PDF (see DocumentScanner), so they go
+  // through the generic file-attachment pipeline instead.
+  function handleScanSave(blob) {
+    const file = new File([blob], `scan-${Date.now()}.png`, { type: 'image/png' })
+    setSubTool(null)
+    uploadFiles([file])
+  }
+
+  function handleScanPdfSave(blob) {
+    const file = new File([blob], `scan-${Date.now()}.pdf`, { type: 'application/pdf' })
+    setSubTool(null)
+    uploadAttachments([file])
   }
 
   function handleAudioSave(blob) {
@@ -1156,6 +1172,9 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
                 <button className="more-menu-item" onClick={() => { setSubTool('drawing'); setShowMoreMenu(false) }}>
                   <IconDrawing width="17" height="17" /> Add drawing
                 </button>
+                <button className="more-menu-item" onClick={() => { setSubTool('scan'); setShowMoreMenu(false) }}>
+                  <IconScan width="17" height="17" /> Scan document
+                </button>
                 <button className="more-menu-item" onClick={() => { setSubTool('audio'); setShowMoreMenu(false) }} disabled={audioUploading}>
                   <IconMic width="17" height="17" /> Record voice memo
                 </button>
@@ -1207,6 +1226,9 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
 
       {subTool === 'drawing' && (
         <DrawingCanvas onCancel={() => setSubTool(null)} onSave={handleDrawingSave} />
+      )}
+      {subTool === 'scan' && (
+        <DocumentScanner onCancel={() => setSubTool(null)} onSave={handleScanSave} onSavePdf={handleScanPdfSave} />
       )}
       {subTool === 'audio' && (
         <AudioRecorder onCancel={() => setSubTool(null)} onSave={handleAudioSave} />
