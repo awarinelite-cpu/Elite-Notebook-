@@ -2612,15 +2612,29 @@ a {
   border-radius: 9999px;
 }
 
-/* ----- buttons: every button is a raised capsule ----- */
+/* ----- buttons: every button is a raised capsule -----
+   !important so this beats the many older per-class button rules above
+   (.fab, .google-btn, .pill-btn ... each set their own radius/shadow). */
 button, input[type="button"], input[type="submit"] {
-  border-radius: 9999px;
-  background-image: var(--gloss-btn);
-  box-shadow: var(--shadow-btn);
+  border-radius: 9999px !important;
+  background-image: var(--gloss-btn) !important;
+  box-shadow: var(--shadow-btn) !important;
   transition: transform .1s, box-shadow .1s, background-color .15s;
 }
-button:disabled { box-shadow: 0 2px 0 rgba(15,23,42,.16); }
+button:disabled { box-shadow: 0 2px 0 rgba(15,23,42,.16) !important; }
 button:not(:disabled):active, input[type="button"]:active, input[type="submit"]:active {
   transform: translateY(3px);
-  box-shadow: var(--shadow-btn-down);
+  box-shadow: var(--shadow-btn-down) !important;
+}
+/* cards: same priority fix so later, more specific rules cannot undo the look */
+.note-card, .login-card, .lock-card, .editor-card, .modal-card { border-radius: 28px !important; }
+.note-card, .login-card, .lock-card, .editor-card, .more-menu, .drive-switcher-menu,
+.conflict-banner, .error-banner, .install-banner, .toast, .audio-clip-row, .drive-row {
+  background-image: var(--gloss-card) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+.drawer-item, .drawer-item.active, .drawer-item:hover:not(.active) {
+  background-image: var(--gloss-card) !important;
+  box-shadow: var(--shadow-card) !important;
+  border-radius: 9999px !important;
 }
