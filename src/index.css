@@ -2567,3 +2567,60 @@ a {
   width: 100%;
   margin-top: 4px;
 }
+
+/* =====================================================================
+   Capsule-tablet look (same design language as MedIndex and EliteReg)
+   - every card: large tablet corners + glossy cylinder shading + soft shadow
+   - every button: raised capsule with a thick bottom edge that presses down
+   Gradients are layered with background-image so each note colour, theme
+   colour and inline style keeps working.
+   ===================================================================== */
+:root {
+  --gloss-card: linear-gradient(to bottom, rgba(255,255,255,.75) 0%, rgba(255,255,255,0) 30%, rgba(71,85,105,.06) 62%, rgba(71,85,105,.16) 100%);
+  --gloss-btn: linear-gradient(180deg, rgba(255,255,255,.34) 0%, rgba(255,255,255,.06) 50%, rgba(0,0,0,.09) 100%);
+  --shadow-card: inset 0 3px 3px rgba(255,255,255,.7), inset 0 -10px 14px rgba(71,85,105,.14), 0 10px 14px -9px rgba(15,23,42,.42);
+  --shadow-btn: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 0 rgba(15,23,42,.26), 0 7px 9px -3px rgba(15,23,42,.28);
+  --shadow-btn-down: inset 0 1px 2px rgba(15,23,42,.35), 0 1px 0 rgba(15,23,42,.26);
+}
+[data-theme="dark"], [data-theme="oled"] {
+  --gloss-card: linear-gradient(to bottom, rgba(255,255,255,.11) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,.14) 65%, rgba(0,0,0,.32) 100%);
+  --gloss-btn: linear-gradient(180deg, rgba(255,255,255,.17) 0%, rgba(255,255,255,.03) 50%, rgba(0,0,0,.20) 100%);
+  --shadow-card: inset 0 2px 2px rgba(255,255,255,.12), inset 0 -10px 14px rgba(0,0,0,.30), 0 10px 14px -9px rgba(0,0,0,.75);
+  --shadow-btn: inset 0 1px 0 rgba(255,255,255,.22), 0 4px 0 rgba(0,0,0,.6), 0 7px 9px -3px rgba(0,0,0,.6);
+  --shadow-btn-down: inset 0 1px 2px rgba(0,0,0,.6), 0 1px 0 rgba(0,0,0,.6);
+}
+
+/* ----- cards ----- */
+.note-card, .login-card, .lock-card, .editor-card, .more-menu, .drive-switcher-menu,
+.conflict-banner, .error-banner, .install-banner, .toast, .audio-clip-row, .drive-row,
+.drawer-item, .drawer-item.active, .drawer-item:hover:not(.active) {
+  background-image: var(--gloss-card);
+  box-shadow: var(--shadow-card);
+}
+.note-card, .login-card, .lock-card, .editor-card, .modal-card { border-radius: 28px; }
+.note-card { padding: 18px 20px; }
+.note-card-swipe-bg, .note-card img, .note-card-collage { border-radius: 28px; }
+.note-card-collage.note-card-media-bleed { border-radius: 28px 28px 0 0; }
+.more-menu, .drive-switcher-menu, .conflict-banner, .error-banner, .install-banner,
+.toast, .audio-clip-row, .drive-row { border-radius: 24px; }
+.more-menu-item, .drive-switcher-item.active, .drive-switcher-item-main { border-radius: 9999px; }
+
+/* every menu item is its own separate card */
+.drawer-item {
+  margin: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+}
+
+/* ----- buttons: every button is a raised capsule ----- */
+button, input[type="button"], input[type="submit"] {
+  border-radius: 9999px;
+  background-image: var(--gloss-btn);
+  box-shadow: var(--shadow-btn);
+  transition: transform .1s, box-shadow .1s, background-color .15s;
+}
+button:disabled { box-shadow: 0 2px 0 rgba(15,23,42,.16); }
+button:not(:disabled):active, input[type="button"]:active, input[type="submit"]:active {
+  transform: translateY(3px);
+  box-shadow: var(--shadow-btn-down);
+}
