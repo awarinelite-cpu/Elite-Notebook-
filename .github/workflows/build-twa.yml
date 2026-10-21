@@ -33,10 +33,16 @@ jobs:
 
       - name: Configure Bubblewrap
         run: |
+          # Bubblewrap only accepts an SDK folder that has a top-level bin/ (or
+          # tools/) directory. The runner's SDK keeps those under
+          # cmdline-tools/latest, so build a thin folder of symlinks to it.
+          SDK="$HOME/android-sdk"
+          mkdir -p "$SDK"
+          for d in "$ANDROID_HOME"/*; do ln -sfn "$d" "$SDK/$(basename "$d")"; done
+          ln -sfn "$ANDROID_HOME/cmdline-tools/latest/bin" "$SDK/bin"
           mkdir -p ~/.bubblewrap
-          cat > ~/.bubblewrap/config.json <<JSON
-          {"jdkPath": "$JAVA_HOME", "androidSdkPath": "$ANDROID_HOME"}
-          JSON
+          echo "{\"jdkPath\": \"$JAVA_HOME\", \"androidSdkPath\": \"$SDK\"}" > ~/.bubblewrap/config.json
+          cat ~/.bubblewrap/config.json
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
 
       - name: Build APK + AAB
