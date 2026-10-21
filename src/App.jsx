@@ -52,6 +52,8 @@ export default function App() {
   }
 
   const [view, setView] = useState('notes')
+  const [driveOpened, setDriveOpened] = useState(false)
+  useEffect(() => { if (view === 'drive') setDriveOpened(true) }, [view])
   const [search, setSearch] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [listView, setListView] = useState(false)
@@ -519,7 +521,13 @@ export default function App() {
         {view === 'labels' && <LabelManager labels={labels} onCreate={createLabel} onDelete={deleteLabel} />}
         {view === 'settings' && <SettingsPanel security={security} />}
         {view === 'help' && <HelpPanel />}
-        {view === 'drive' && <DrivePanel ref={drivePanelRef} />}
+        {/* Once opened, Drive stays mounted (hidden) so music keeps playing and
+            its player stays reachable after switching to notes. */}
+        {driveOpened && (
+          <div className={view === 'drive' ? 'drive-keepalive' : 'drive-keepalive drive-keepalive-hidden'}>
+            <DrivePanel ref={drivePanelRef} />
+          </div>
+        )}
         {view === 'keep-import' && (
           <KeepImportPanel
             notes={notes}

@@ -214,6 +214,55 @@ function MiniAudioPlayer({ file, src, loading, error, hasPrev, hasNext, onPrev, 
     el.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
   }, [src])
 
+  // Media Session: lets Android keep this playing with the screen off or the
+  // app in the background, and shows the track with play/pause/next/previous
+  // on the lock screen and notification shade.
+  const cb = useRef({})
+  cb.current = { onPrev, onNext, onClose, hasPrev, hasNext }
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : null
+    if (!ms) return undefined
+    const el = () => audioRef.current
+    const set = (action, fn) => { try { ms.setActionHandler(action, fn) } catch { /* unsupported */ } }
+    set('play', () => { el()?.play() })
+    set('pause', () => { el()?.pause() })
+    set('stop', () => cb.current.onClose())
+    set('previoustrack', () => { if (cb.current.hasPrev) cb.current.onPrev() })
+    set('nexttrack', () => { if (cb.current.hasNext) cb.current.onNext() })
+    set('seekbackward', (d) => { const a = el(); if (a) a.currentTime = Math.max(0, a.currentTime - (d?.seekOffset || 10)) })
+    set('seekforward', (d) => { const a = el(); if (a) a.currentTime = Math.min(a.duration || Infinity, a.currentTime + (d?.seekOffset || 10)) })
+    set('seekto', (d) => { const a = el(); if (a && d?.seekTime != null) a.currentTime = d.seekTime })
+    return () => {
+      for (const a of ['play', 'pause', 'stop', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward', 'seekto']) set(a, null)
+      try { ms.metadata = null; ms.playbackState = 'none' } catch { /* ignore */ }
+    }
+  }, [])
+
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : null
+    if (!ms || typeof MediaMetadata === 'undefined') return
+    try {
+      ms.metadata = new MediaMetadata({
+        title: (file?.name || 'Audio').replace(/\.[a-z0-9]{2,4}$/i, ''),
+        artist: 'Elite Notebook',
+        album: 'Google Drive',
+        artwork: [{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
+      })
+    } catch { /* ignore */ }
+  }, [file?.id])
+
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : null
+    if (!ms) return
+    try { ms.playbackState = playing ? 'playing' : 'paused' } catch { /* ignore */ }
+  }, [playing])
+
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : null
+    if (!ms?.setPositionState || !duration || !Number.isFinite(duration)) return
+    try { ms.setPositionState({ duration, playbackRate: 1, position: Math.min(progress, duration) }) } catch { /* ignore */ }
+  }, [duration, Math.floor(progress)])
+
   function togglePlay() {
     const el = audioRef.current
     if (!el || !src) return
@@ -238,10 +287,14 @@ function MiniAudioPlayer({ file, src, loading, error, hasPrev, hasNext, onPrev, 
 
   return (
     <div className="media-mini-player">
-      {src && (
+      {/* Always mounted (never torn down between tracks) so playback is not
+          interrupted when the app is backgrounded. */}
+      {(
         <audio
           ref={audioRef}
-          src={src}
+          src={src || undefined}
+          autoPlay
+          preload="auto"
           onTimeUpdate={(e) => setProgress(e.target.currentTime)}
           onLoadedMetadata={(e) => setDuration(e.target.duration)}
           onEnded={onNext}
@@ -315,7 +368,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [search, setSearch] = useState('')
   const [previewing, setPreviewing] = useState(null)
   const [media, setMedia] = useState(null) // { queue: [file...], index, kind: 'audio' | 'video' }
-  const [mediaSrc, setMediaSrc] = useState(null) // blob: URL for media.queue[media.index]
+  const [mediaSrc, setMediaSrc] = useState(null)
+  const preloadRef = useRef(null) // { id, url } next track already downloaded // blob: URL for media.queue[media.index]
   const [mediaLoading, setMediaLoading] = useState(false)
   const [mediaError, setMediaError] = useState(null)
   const [folderStack, setFolderStack] = useState([]) // [{ id, name }], in-app folder navigation
@@ -440,37 +494,81 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   // changes on open, and again on next/prev), swapping in a fresh blob:
   // URL each time and revoking the previous one so we don't leak memory
   // across a long playlist session.
+  //
+  // For audio, the NEXT track is downloaded ahead of time while the current
+  // one plays. When a song ends with the phone locked or the app in the
+  // background, the next one can then start instantly instead of waiting on
+  // a network fetch the browser may have throttled.
+  async function loadDriveBlob(file) {
+    try {
+      return await fetchDriveMediaBlob(file.id, accessToken)
+    } catch (e) {
+      if (e.status === 401) {
+        const fresh = await reconnect(email, true)
+        if (!fresh) throw e
+        return fetchDriveMediaBlob(file.id, fresh.accessToken)
+      }
+      throw e
+    }
+  }
+
+  function dropPreload() {
+    const p = preloadRef.current
+    preloadRef.current = null
+    if (p?.url) URL.revokeObjectURL(p.url)
+  }
+
+  useEffect(() => () => dropPreload(), [])
+
   useEffect(() => {
-    if (!media) { setMediaSrc(null); setMediaError(null); return }
+    if (!media) { setMediaSrc(null); setMediaError(null); dropPreload(); return }
     let cancelled = false
     let objectUrl = null
-    setMediaSrc(null)
-    setMediaError(null)
-    setMediaLoading(true)
     const file = media.queue[media.index]
-    ;(async () => {
-      try {
-        let blob
+    const pre = preloadRef.current
+    const preloaded = pre && pre.id === file.id && pre.url
+    if (pre && !preloaded) dropPreload()
+    setMediaError(null)
+
+    function preloadNext() {
+      if (media.kind !== 'audio') return
+      const nextFile = media.queue[media.index + 1]
+      if (!nextFile || preloadRef.current?.id === nextFile.id) return
+      dropPreload()
+      const slot = { id: nextFile.id, url: null }
+      preloadRef.current = slot
+      loadDriveBlob(nextFile)
+        .then((blob) => {
+          if (preloadRef.current !== slot) return
+          slot.url = URL.createObjectURL(blob)
+        })
+        .catch(() => { if (preloadRef.current === slot) preloadRef.current = null })
+    }
+
+    if (preloaded) {
+      // Already downloaded: switch straight over with no loading gap.
+      objectUrl = pre.url
+      preloadRef.current = null
+      setMediaLoading(false)
+      setMediaSrc(objectUrl)
+      preloadNext()
+    } else {
+      setMediaSrc(null)
+      setMediaLoading(true)
+      ;(async () => {
         try {
-          blob = await fetchDriveMediaBlob(file.id, accessToken)
+          const blob = await loadDriveBlob(file)
+          if (cancelled) return
+          objectUrl = URL.createObjectURL(blob)
+          setMediaSrc(objectUrl)
+          preloadNext()
         } catch (e) {
-          if (e.status === 401) {
-            const fresh = await reconnect(email, true)
-            if (!fresh) throw e
-            blob = await fetchDriveMediaBlob(file.id, fresh.accessToken)
-          } else {
-            throw e
-          }
+          if (!cancelled) setMediaError("Couldn't load this file")
+        } finally {
+          if (!cancelled) setMediaLoading(false)
         }
-        if (cancelled) return
-        objectUrl = URL.createObjectURL(blob)
-        setMediaSrc(objectUrl)
-      } catch (e) {
-        if (!cancelled) setMediaError("Couldn't load this file")
-      } finally {
-        if (!cancelled) setMediaLoading(false)
-      }
-    })()
+      })()
+    }
     return () => {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
