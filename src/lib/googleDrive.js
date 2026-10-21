@@ -143,22 +143,47 @@ function startRedirectAuth({ loginHint, selectAccount }) {
   return new Promise(() => {})
 }
 
-// Call once on startup. If the URL hash carries an OAuth redirect result,
-// turns it into a Drive session (and cleans the URL). Returns null otherwise.
+const OAUTH_PENDING_KEY = 'elite-notebook:drive-oauth-pending'
+
+// Call synchronously at startup (main.jsx), before the app renders: if the URL
+// hash carries an OAuth redirect result, park it in localStorage and clean the
+// URL. Drive may not be mounted yet (the app opens on Notes), so the token is
+// picked up later by consumeRedirectResult().
+export function captureRedirectHash() {
+  try {
+    const hash = window.location.hash
+    if (!hash || !hash.includes('state=')) return
+    const p = new URLSearchParams(hash.replace(/^#/, ''))
+    const expected = localStorage.getItem(OAUTH_STATE_KEY)
+    if (!expected || p.get('state') !== expected) return
+    localStorage.removeItem(OAUTH_STATE_KEY)
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+    localStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({
+      token: p.get('access_token') || null,
+      expiresIn: Number(p.get('expires_in')) || 3300,
+      error: p.get('error') || null,
+      ts: Date.now(),
+    }))
+  } catch { /* ignore */ }
+}
+
+export function hasPendingRedirect() {
+  try { return !!localStorage.getItem(OAUTH_PENDING_KEY) } catch { return false }
+}
+
+// Turns a parked redirect result into a Drive session. Returns null if none,
+// throws if Google reported an error.
 export async function consumeRedirectResult() {
-  const hash = window.location.hash
-  if (!hash || !hash.includes('state=')) return null
-  const p = new URLSearchParams(hash.replace(/^#/, ''))
-  const expected = localStorage.getItem(OAUTH_STATE_KEY)
-  if (!expected || p.get('state') !== expected) return null
-  localStorage.removeItem(OAUTH_STATE_KEY)
-  history.replaceState(null, '', window.location.pathname + window.location.search)
-  const token = p.get('access_token')
-  if (!token) return null
-  const profile = await fetchEmail(token)
+  let pending = null
+  try { pending = JSON.parse(localStorage.getItem(OAUTH_PENDING_KEY) || 'null') } catch { /* ignore */ }
+  if (!pending) return null
+  localStorage.removeItem(OAUTH_PENDING_KEY)
+  if (pending.error) throw new Error(pending.error)
+  if (!pending.token || Date.now() - pending.ts > 10 * 60 * 1000) return null
+  const profile = await fetchEmail(pending.token)
   return {
-    accessToken: token,
-    expiresAt: Date.now() + (Number(p.get('expires_in')) || 3300) * 1000,
+    accessToken: pending.token,
+    expiresAt: pending.ts + pending.expiresIn * 1000,
     email: profile?.email || null,
     name: profile?.name || null,
     picture: profile?.picture || null,

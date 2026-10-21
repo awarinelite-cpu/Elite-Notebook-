@@ -6,6 +6,11 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
+import { captureRedirectHash } from './lib/googleDrive.js'
+
+// Finishing a Google Drive sign-in redirect: grab the token from the URL before
+// anything else can change it.
+captureRedirectHash()
 
 // registerType is 'autoUpdate', but the plugin's own auto-injected register
 // script never actually reloads the tab once a new service worker takes

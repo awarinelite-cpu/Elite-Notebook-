@@ -28,6 +28,7 @@ import DrawingCanvas from './components/DrawingCanvas.jsx'
 import AudioRecorder from './components/AudioRecorder.jsx'
 import { stripHtml } from './lib/richText.js'
 import Toast from './components/Toast.jsx'
+import { hasPendingRedirect } from './lib/googleDrive.js'
 import { peekPendingShare, clearPendingShare } from './shareTargetDb.js'
 
 const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive', 'keep-import']
@@ -51,7 +52,8 @@ export default function App() {
     setInstallBannerDismissed(true)
   }
 
-  const [view, setView] = useState('notes')
+  // Coming back from Google's Drive sign-in page: open straight on Drive so it can finish.
+  const [view, setView] = useState(() => (hasPendingRedirect() ? 'drive' : 'notes'))
   const [driveOpened, setDriveOpened] = useState(false)
   useEffect(() => { if (view === 'drive') setDriveOpened(true) }, [view])
   const [search, setSearch] = useState('')
