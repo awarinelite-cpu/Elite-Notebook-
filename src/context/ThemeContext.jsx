@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
 const ThemeContext = createContext(null)
-const THEMES = ['light', 'dark', 'oled']
+const THEMES = ['light', 'dark', 'oled', 'fruit']
 
 function getInitialTheme() {
   const saved = localStorage.getItem('theme')

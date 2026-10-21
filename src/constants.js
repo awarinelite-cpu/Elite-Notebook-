@@ -40,10 +40,26 @@ export const NOTE_COLORS_OLED = {
   clay: '#2D271D',
 }
 
+// "Fruit" theme: deep forest green with golden-yellow accents. Note tints are
+// green/gold-leaning so every card sits comfortably on the green page.
+export const NOTE_COLORS_FRUIT = {
+  default: '#16302F',
+  coral: '#4D2F2A',
+  peach: '#52411B',
+  sand: '#4B4A22',
+  sage: '#2D4D2D',
+  fog: '#15493F',
+  storm: '#1C4152',
+  dusk: '#3B3152',
+  blossom: '#4B2D3D',
+  clay: '#3F392A',
+}
+
 // Kept for any code that hasn't switched to getNoteColors(theme) yet.
 export const NOTE_COLORS = NOTE_COLORS_LIGHT
 
 export function getNoteColors(theme) {
+  if (theme === 'fruit') return NOTE_COLORS_FRUIT
   if (theme === 'oled') return NOTE_COLORS_OLED
   if (theme === 'dark') return NOTE_COLORS_DARK
   return NOTE_COLORS_LIGHT

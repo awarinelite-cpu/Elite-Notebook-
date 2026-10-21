@@ -84,6 +84,7 @@ export default function SettingsPanel({ security }) {
             { id: 'light', label: 'Light', icon: <IconSun width="16" height="16" /> },
             { id: 'dark', label: 'Dark', icon: <IconMoon width="16" height="16" /> },
             { id: 'oled', label: 'OLED black', icon: <IconMoon width="16" height="16" /> },
+            { id: 'fruit', label: 'Fruit', icon: <span style={{ fontSize: 16, lineHeight: '16px' }}>🍊</span> },
           ].map((opt) => (
             <button
               key={opt.id}

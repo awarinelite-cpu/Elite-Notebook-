@@ -79,6 +79,38 @@
   --card-clay: #2D271D;
 }
 
+/* Fruit — deep forest green, golden-yellow accents, cream text and olive
+   highlights, with thin cream outlines on cards (from the Fruit app design). */
+[data-theme="fruit"] {
+  --bg: #11282A;
+  --surface: #16302F;
+  --surface-soft: #1F403D;
+  --ink: #F4EFD8;
+  --ink-soft: #BFC76A;
+  --border: rgba(232, 218, 150, 0.45);
+  --accent: #F0B93A;
+  --fab: #F0B93A;
+  --fab-icon: #11282A;
+  --shadow: rgba(0, 0, 0, 0.45);
+
+  --card-default: #16302F;
+  --card-coral: #4D2F2A;
+  --card-peach: #52411B;
+  --card-sand: #4B4A22;
+  --card-sage: #2D4D2D;
+  --card-fog: #15493F;
+  --card-storm: #1C4152;
+  --card-dusk: #3B3152;
+  --card-blossom: #4B2D3D;
+  --card-clay: #3F392A;
+}
+[data-theme="fruit"] .note-card,
+[data-theme="fruit"] .editor-card,
+[data-theme="fruit"] .modal-card,
+[data-theme="fruit"] .drive-row {
+  border: 1px solid var(--border);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1295,7 +1327,8 @@ a {
   flex-direction: column;
   gap: 8px;
 }
-[data-theme='dark'] .conflict-banner {
+[data-theme='dark'] .conflict-banner,
+[data-theme='fruit'] .conflict-banner {
   background: #4a3c0a;
   color: #f9d97a;
   border-color: #8a6d1a;
@@ -1320,7 +1353,8 @@ a {
   color: #3c2f00;
   border-color: #f9ab00;
 }
-[data-theme='dark'] .conflict-banner-actions button:first-child {
+[data-theme='dark'] .conflict-banner-actions button:first-child,
+[data-theme='fruit'] .conflict-banner-actions button:first-child {
   color: #4a3c0a;
 }
 
@@ -2582,7 +2616,7 @@ a {
   --shadow-btn: inset 0 1px 0 rgba(255,255,255,.5), 0 4px 0 rgba(15,23,42,.26), 0 7px 9px -3px rgba(15,23,42,.28);
   --shadow-btn-down: inset 0 1px 2px rgba(15,23,42,.35), 0 1px 0 rgba(15,23,42,.26);
 }
-[data-theme="dark"], [data-theme="oled"] {
+[data-theme="dark"], [data-theme="oled"], [data-theme="fruit"] {
   --gloss-card: linear-gradient(to bottom, rgba(255,255,255,.11) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,.14) 65%, rgba(0,0,0,.32) 100%);
   --gloss-btn: linear-gradient(180deg, rgba(255,255,255,.17) 0%, rgba(255,255,255,.03) 50%, rgba(0,0,0,.20) 100%);
   --shadow-card: inset 0 2px 2px rgba(255,255,255,.12), inset 0 -10px 14px rgba(0,0,0,.30), 0 10px 14px -9px rgba(0,0,0,.75);
