@@ -1,0 +1,32 @@
+{
+  "packageId": "com.elitenotebook.twa",
+  "host": "elite-notebook.vercel.app",
+  "name": "The Elite Notebook",
+  "launcherName": "Elite Notebook",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#FDD663",
+  "themeColorDark": "#FDD663",
+  "navigationColor": "#E9EAF6",
+  "navigationColorDark": "#E9EAF6",
+  "navigationDividerColor": "#E9EAF6",
+  "navigationDividerColorDark": "#E9EAF6",
+  "backgroundColor": "#E9EAF6",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://elite-notebook.vercel.app/icon-512.png",
+  "maskableIconUrl": "https://elite-notebook.vercel.app/icon-maskable-512.png",
+  "appVersion": "1",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "elitenotebook"
+  },
+  "webManifestUrl": "https://elite-notebook.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "minSdkVersion": 21,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "generatorApp": "bubblewrap-cli"
+}

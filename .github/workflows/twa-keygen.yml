@@ -1,0 +1,51 @@
+name: TWA - Generate signing key (run once)
+
+# Creates the Android signing key for the TWA and shows its SHA-256
+# fingerprint. Run this ONCE, then save the downloaded keystore as the
+# repo secrets listed in the run summary. Never run it again unless you
+# want a brand-new app identity: apps signed with a different key cannot
+# update an installed copy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      password:
+        description: 'Strong keystore password (min 8 chars, no spaces/quotes)'
+        required: true
+
+jobs:
+  keygen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Generate keystore
+        env:
+          PW: ${{ inputs.password }}
+        run: |
+          echo "::add-mask::$PW"
+          keytool -genkeypair -v -storetype PKCS12 -keystore android.keystore \
+            -alias elitenotebook -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "$PW" -keypass "$PW" \
+            -dname "CN=Elite Notebook, O=Elite, C=NG"
+          base64 -w0 android.keystore > keystore.b64
+          FP=$(keytool -list -v -keystore android.keystore -storepass "$PW" -alias elitenotebook | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
+          {
+            echo "### Signing key created"
+            echo "SHA-256: \`$FP\`"
+            echo
+            echo "1. Download the **elitenotebook-keystore** artifact below (it expires in 1 day)."
+            echo "2. In Settings > Secrets and variables > Actions, add:"
+            echo "   - \`ANDROID_KEYSTORE_BASE64\` = the text inside keystore.b64"
+            echo "   - \`ANDROID_KEYSTORE_PASSWORD\` = the password you typed"
+            echo "3. Delete the artifact, then run **Build TWA**."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elitenotebook-keystore
+          path: keystore.b64
+          retention-days: 1

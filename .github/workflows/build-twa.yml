@@ -1,0 +1,79 @@
+name: Build TWA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS" ]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret. Run 'TWA - Generate signing key' first."
+            exit 1
+          fi
+          echo "$KS" | base64 -d > twa/android.keystore
+
+      - name: Configure Bubblewrap
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json <<JSON
+          {"jdkPath": "$JAVA_HOME", "androidSdkPath": "$ANDROID_HOME"}
+          JSON
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+
+      - name: Build APK + AAB
+        working-directory: twa
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          npx --yes @bubblewrap/cli build --skipPwaValidation --skipSigning=false </dev/null || \
+          (yes | npx --yes @bubblewrap/cli build --skipPwaValidation)
+          ls -la
+
+      - name: Update assetlinks.json with this key's fingerprint
+        env:
+          PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          FP=$(keytool -list -v -keystore twa/android.keystore -storepass "$PW" -alias elitenotebook | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
+          cat > public/.well-known/assetlinks.json <<JSON
+          [{
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "com.elitenotebook.twa",
+              "sha256_cert_fingerprints": ["$FP"]
+            }
+          }]
+          JSON
+          sed -i 's/^          //' public/.well-known/assetlinks.json
+          echo "### assetlinks.json fingerprint: \`$FP\`" >> "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add public/.well-known/assetlinks.json
+          git diff --cached --quiet || (git commit -m "Update assetlinks.json with TWA signing fingerprint" && git push)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elite-notebook-twa
+          path: |
+            twa/app-release-signed.apk
+            twa/app-release-bundle.aab
