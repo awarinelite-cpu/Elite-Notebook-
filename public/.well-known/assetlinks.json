@@ -1,1 +1,8 @@
-[]
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.elitenotebook.twa",
+    "sha256_cert_fingerprints": ["02:A7:9E:D2:B4:C8:3D:46:17:F4:7D:DF:5F:5F:1D:2A:EB:B5:6D:18:B2:59:A4:C8:7C:61:E0:89:39:9C:24:3F"]
+  }
+}]
