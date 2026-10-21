@@ -2638,3 +2638,20 @@ button:not(:disabled):active, input[type="button"]:active, input[type="submit"]:
   box-shadow: var(--shadow-card) !important;
   border-radius: 9999px !important;
 }
+
+
+/* ---------- Fixes: card spacing + missing attachment placeholder ---------- */
+/* The swipe wrapper zeroes the card's own bottom margin, so the wrapper must
+   carry the gap or cards in the columns layout touch/overlap. */
+.note-card-swipe-wrapper { margin-bottom: 14px; }
+.note-card { margin-bottom: 14px; }
+.note-card-swipe-wrapper .note-card { margin-bottom: 0; }
+.note-grid { column-gap: 14px; }
+@media (max-width: 560px) { .note-grid { column-gap: 12px; } }
+
+.attachment-missing {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; min-height: 56px;
+  font-size: 11px; text-align: center; padding: 4px;
+  color: var(--ink-soft); background: rgba(128,128,128,.15);
+}
