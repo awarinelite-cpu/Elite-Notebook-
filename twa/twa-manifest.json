@@ -16,8 +16,8 @@
   "startUrl": "/",
   "iconUrl": "https://elite-notebook.vercel.app/icon-512.png",
   "maskableIconUrl": "https://elite-notebook.vercel.app/icon-maskable-512.png",
-  "appVersion": "1",
-  "appVersionCode": 1,
+  "appVersion": "2",
+  "appVersionCode": 2,
   "signingKey": {
     "path": "./android.keystore",
     "alias": "elitenotebook"
@@ -30,5 +30,33 @@
   "isMetaQuest": false,
   "generatorApp": "bubblewrap-cli",
   "splashScreenFadeOutDuration": 300,
-  "enableSiteSettingsShortcut": true
+  "enableSiteSettingsShortcut": true,
+  "shareTarget": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "image/*",
+            "application/pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
+            ".txt",
+            ".csv",
+            "text/*"
+          ]
+        }
+      ]
+    }
+  }
 }
