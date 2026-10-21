@@ -25,7 +25,7 @@
   "webManifestUrl": "https://elite-notebook.vercel.app/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "generatorApp": "bubblewrap-cli",
