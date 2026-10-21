@@ -28,7 +28,7 @@ import DrawingCanvas from './components/DrawingCanvas.jsx'
 import AudioRecorder from './components/AudioRecorder.jsx'
 import { stripHtml } from './lib/richText.js'
 import Toast from './components/Toast.jsx'
-import { takePendingShare } from './shareTargetDb.js'
+import { peekPendingShare, clearPendingShare } from './shareTargetDb.js'
 
 const PANEL_VIEWS = ['labels', 'settings', 'help', 'drive', 'keep-import']
 
@@ -37,7 +37,7 @@ export default function App() {
   const { notes, error, syncStatus, createNote, updateNote, deleteNoteForever, uploadImage } = useNotes()
   const { labels, createLabel, deleteLabel } = useLabels()
   const security = useSecurity()
-  usePrefetchAttachments(security.unlocked ? notes : null)
+  usePrefetchAttachments(security.unlocked || !security.hasPin ? notes : null)
   useReminderNotifications(notes, (noteId) => {
     const target = notes.find((n) => n.id === noteId)
     if (target) setEditingNote(target)
@@ -227,30 +227,31 @@ export default function App() {
   }, [view])
 
   // Someone shared a file/link/text to the installed app from the OS share
-  // sheet. The service worker stashed it in IndexedDB and redirected here
-  // with ?shared=1 — pick it up, open the editor with it attached, and
-  // clean the URL so a refresh doesn't reprocess it.
+  // sheet. The service worker stashed it in IndexedDB and redirected here.
+  // We look in that mailbox on every start (not just when the URL says
+  // ?shared) so a reload or a lock screen can't make us miss it, open the
+  // editor with it attached, and only empty the mailbox once the editor has it.
+  const [shareClaimed, setShareClaimed] = useState(0)
   useEffect(() => {
     if (!user) return
     const params = new URLSearchParams(window.location.search)
-    if (!params.has('shared')) return
-    window.history.replaceState({}, '', window.location.pathname)
-    // Protect the incoming share from a service-worker-update reload until
-    // the editor has it (see main.jsx).
-    window.__eliteKeepOpen = true
+    if (params.has('shared')) window.history.replaceState({}, '', window.location.pathname)
     if (params.get('shared') === 'error') {
-      window.__eliteKeepOpen = false
       setToast('The shared item could not be received. Please try sharing again.')
       return
     }
+    let cancelled = false
     ;(async () => {
       let share = null
-      try { share = await takePendingShare() } catch (e) { console.error('takePendingShare failed:', e) }
+      try { share = await peekPendingShare() } catch (e) { console.error('peekPendingShare failed:', e) }
+      if (cancelled) return
       if (!share) {
-        window.__eliteKeepOpen = false
-        setToast('Nothing arrived from the share. Please try sharing again.')
+        if (params.has('shared')) setToast('Nothing arrived from the share. Please try sharing again.')
         return
       }
+      // Keep the page from being reloaded by a service-worker update until
+      // the editor has the shared item (see main.jsx).
+      window.__eliteKeepOpen = true
       const files = share.files || []
       const imageFiles = files.filter((f) => f.type?.startsWith('image/'))
       const docFiles = files.filter((f) => !f.type?.startsWith('image/'))
@@ -262,8 +263,15 @@ export default function App() {
         pendingFiles: [...((d && d.pendingFiles) || []), ...imageFiles],
         pendingDocFiles: [...((d && d.pendingDocFiles) || []), ...docFiles],
       }))
+      setShareClaimed(share.ts || 1)
     })()
+    return () => { cancelled = true }
   }, [user])
+
+  // The editor now holds the shared item — safe to empty the mailbox.
+  useEffect(() => {
+    if (shareClaimed) clearPendingShare().catch(() => {})
+  }, [shareClaimed])
 
   // Tapping a reminder notification (see notificationclick in src/sw.js)
   // reaches the app one of two ways: a `message` event if a window was
@@ -314,7 +322,7 @@ export default function App() {
   if (loading) return null
   if (!user) return <Login />
   if (security.loading) return null
-  if (!security.unlocked) return <SecurityLock security={security} />
+  if (security.hasPin && !security.unlocked) return <SecurityLock security={security} />
 
   function togglePin(note) {
     updateNote(note.id, { pinned: !note.pinned })

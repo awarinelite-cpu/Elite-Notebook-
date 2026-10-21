@@ -44,3 +44,24 @@ export async function takePendingShare() {
     getReq.onerror = () => reject(getReq.error)
   })
 }
+
+// Reads the pending share without deleting it, so a reload before the editor
+// has it doesn't lose the shared item. Call clearPendingShare() once it is safe.
+export async function peekPendingShare() {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(KEY)
+    req.onsuccess = () => resolve(req.result || null)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+export async function clearPendingShare() {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).delete(KEY)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
