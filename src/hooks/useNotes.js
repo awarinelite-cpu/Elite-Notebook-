@@ -34,15 +34,21 @@ function refsInNote(note) {
   return out
 }
 
-// Pictures go into Firestore (src/lib/fsImages.js); voice memos and documents
-// go to Firebase Storage.
+// Pictures: Cloudinary first when it is set up (Settings), with Firestore
+// (src/lib/fsImages.js) as the backup — used when Cloudinary is not set up or
+// refuses the photo (e.g. quota reached). Existing "fs:" pictures keep working.
+// Voice memos and documents go to Firebase Storage.
 async function uploadBlobToStorage(uid, file) {
   if ((file.type || '').startsWith('image/')) {
-    // Pictures live in Firestore (works offline, free). Only a picture that
-    // cannot be shrunk small enough falls back to Cloudinary / Storage.
+    if (getCloudinaryConfig()) {
+      try { return await uploadToCloudinary(file) } catch (err) {
+        // Offline / busy: let the caller keep the file and retry later.
+        if (err instanceof RetryLater) throw err
+        console.warn('Cloudinary failed, saving picture to Firestore instead:', err?.message || err)
+      }
+    }
     try { return await saveFsImage(uid, file) } catch (err) {
       if (!(err instanceof TooBigForFirestore)) throw err
-      if (getCloudinaryConfig()) return uploadToCloudinary(file)
     }
   }
   const storageRef = ref(storage, `notes/${uid}/${Date.now()}-${file.name}`)
@@ -223,8 +229,10 @@ export function useNotes() {
     if (!user) return { url: null, error: 'Not signed in' }
     try {
       const isImg = (file.type || '').startsWith('image/')
-      // Pictures save to Firestore even offline (queued); other files wait locally.
-      if (!navigator.onLine && !isImg) return { url: await putPending(file), error: null }
+      // Offline: pictures go straight to Firestore (queued) only when Cloudinary
+      // isn't set up; otherwise they wait on the device for Cloudinary, like
+      // every other file.
+      if (!navigator.onLine && !(isImg && !getCloudinaryConfig())) return { url: await putPending(file), error: null }
       const url = await uploadBlobToStorage(user.uid, file)
       return { url, error: null }
     } catch (err) {
