@@ -112,6 +112,7 @@ self.addEventListener('notificationclick', (event) => {
 })
 
 async function handleShareTarget(event) {
+  let ok = true
   try {
     const formData = await event.request.formData()
     const title = formData.get('title') || ''
@@ -120,7 +121,8 @@ async function handleShareTarget(event) {
     const files = formData.getAll('files').filter((f) => f instanceof File && f.size > 0)
     await putPendingShare({ title, text, url: sharedUrl, files, ts: Date.now() })
   } catch (err) {
+    ok = false
     console.error('share-target handling failed:', err)
   }
-  return Response.redirect('/?shared=1', 303)
+  return Response.redirect(ok ? '/?shared=1' : '/?shared=error', 303)
 }

@@ -209,6 +209,17 @@ export default function App() {
     }
   }, [])
 
+  // While any editor is open, a service-worker update must not reload the page
+  // (it would discard what is being typed or just shared). Reload afterwards.
+  useEffect(() => {
+    const open = !!(draft || editingNote)
+    window.__eliteKeepOpen = open
+    if (!open && window.__eliteReloadPending) {
+      window.__eliteReloadPending = false
+      window.location.reload()
+    }
+  }, [draft, editingNote])
+
   // Leaving the current view (e.g. via the drawer) exits selection mode so
   // stale selections don't linger against a different list of notes.
   useEffect(() => {
@@ -224,9 +235,22 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     if (!params.has('shared')) return
     window.history.replaceState({}, '', window.location.pathname)
+    // Protect the incoming share from a service-worker-update reload until
+    // the editor has it (see main.jsx).
+    window.__eliteKeepOpen = true
+    if (params.get('shared') === 'error') {
+      window.__eliteKeepOpen = false
+      setToast('The shared item could not be received. Please try sharing again.')
+      return
+    }
     ;(async () => {
-      const share = await takePendingShare()
-      if (!share) return
+      let share = null
+      try { share = await takePendingShare() } catch (e) { console.error('takePendingShare failed:', e) }
+      if (!share) {
+        window.__eliteKeepOpen = false
+        setToast('Nothing arrived from the share. Please try sharing again.')
+        return
+      }
       const files = share.files || []
       const imageFiles = files.filter((f) => f.type?.startsWith('image/'))
       const docFiles = files.filter((f) => !f.type?.startsWith('image/'))

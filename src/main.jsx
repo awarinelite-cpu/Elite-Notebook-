@@ -18,6 +18,9 @@ let refreshing = false
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return
+    // An editor is open (e.g. a just-shared picture/text, or a note being
+    // typed): reloading would throw it away, so wait until it is closed.
+    if (window.__eliteKeepOpen) { window.__eliteReloadPending = true; return }
     refreshing = true
     window.location.reload()
   })
