@@ -28,5 +28,7 @@
   "minSdkVersion": 21,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "generatorApp": "bubblewrap-cli"
+  "generatorApp": "bubblewrap-cli",
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": true
 }
