@@ -14,6 +14,7 @@
 // matters here).
 
 import { hasCached, putCached } from './localBlobStore.js'
+import { getFsImageBlob, isFsRef } from './fsImages.js'
 
 const ATTACHMENT_ORIGINS = ['https://firebasestorage.googleapis.com', 'https://res.cloudinary.com']
 const CONCURRENCY = 3
@@ -67,7 +68,31 @@ async function fetchWithLimit(urls) {
 
 // Call whenever the notes list updates. Safe to call often — it no-ops for
 // URLs already attempted or already cached.
+// Firestore-stored pictures: pull each one into the on-device copy so it
+// opens offline, even on a second device.
+let fsRunning = false
+async function precacheFsImages(notes) {
+  if (fsRunning) return
+  fsRunning = true
+  try {
+    for (const note of notes) {
+      for (const s of note.images || []) {
+        if (!isFsRef(s) || attempted.has(s)) continue
+        attempted.add(s)
+        try {
+          if (await hasCached(s)) continue
+          if (!(await getFsImageBlob(s))) attempted.delete(s)
+        } catch { attempted.delete(s) }
+      }
+    }
+  } finally { fsRunning = false }
+}
+
 export function precacheAttachments(notes) {
+  if (Array.isArray(notes) && notes.length) {
+    const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 500))
+    schedule(() => { precacheFsImages(notes) })
+  }
   if (!navigator.onLine || !('serviceWorker' in navigator)) return
   if (!Array.isArray(notes) || notes.length === 0) return
 

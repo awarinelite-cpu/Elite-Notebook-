@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
 import { linkifyHtml } from '../lib/linkify.js'
 import { AttachmentImg, AttachmentAudio, AttachmentLink } from './AttachmentMedia.jsx'
+import { fetchAttachmentBlob } from '../lib/fsImages.js'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -176,8 +177,7 @@ export default function NoteCard({
         try {
           files = await Promise.all(
             images.slice(0, 5).map(async (url, i) => {
-              const res = await fetch(url)
-              const blob = await res.blob()
+              const blob = await fetchAttachmentBlob(url)
               return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
             })
           )

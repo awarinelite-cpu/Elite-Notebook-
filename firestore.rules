@@ -14,6 +14,12 @@ service cloud.firestore {
       }
     }
 
+    // Pictures stored as small base64 JPEGs (see src/lib/fsImages.js).
+    match /images/{imageId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+
     match /labels/{labelId} {
       allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.uid;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;

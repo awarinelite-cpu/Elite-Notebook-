@@ -15,7 +15,7 @@ function collectAttachmentUrls(notes) {
   const urls = new Set()
   for (const note of notes) {
     for (const src of note.images || []) {
-      if (typeof src === 'string') urls.add(src)
+      if (typeof src === 'string' && /^https?:/.test(src)) urls.add(src)
     }
     for (const src of note.audio || []) {
       if (typeof src === 'string') urls.add(src)

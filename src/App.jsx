@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { useAuth } from './context/AuthContext.jsx'
+import { fetchAttachmentBlob } from './lib/fsImages.js'
 import { useNotes } from './hooks/useNotes.js'
 import { useLabels } from './hooks/useLabels.js'
 import { useSecurity } from './hooks/useSecurity.js'
@@ -393,8 +394,7 @@ export default function App() {
         try {
           files = await Promise.all(
             allImageUrls.map(async (url, i) => {
-              const res = await fetch(url)
-              const blob = await res.blob()
+              const blob = await fetchAttachmentBlob(url)
               return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
             })
           )

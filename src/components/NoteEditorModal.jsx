@@ -14,6 +14,7 @@ import { saveVersionIfChanged, snapshotOf } from '../lib/versions.js'
 import { linkifyHtml } from '../lib/linkify.js'
 import VersionHistoryPanel from './VersionHistoryPanel.jsx'
 import { AttachmentImg, AttachmentAudio, AttachmentLink } from './AttachmentMedia.jsx'
+import { fetchAttachmentBlob, isFsRef } from '../lib/fsImages.js'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
 
@@ -637,10 +638,8 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
           // (see sw.js) with a cache-busting param — otherwise a stale opaque
           // (no-cors) response cached before the bucket's CORS was fixed
           // keeps getting served here forever instead of a real network hit.
-          const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now()
-          const res = await fetch(bustUrl, { cache: 'no-store' })
-          if (!res.ok) throw new Error('bad response')
-          const blob = await res.blob()
+          const bustUrl = isFsRef(url) ? url : url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now()
+          const blob = await fetchAttachmentBlob(bustUrl, { cache: 'no-store' })
           return new File([blob], `image-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' })
         } catch {
           return null

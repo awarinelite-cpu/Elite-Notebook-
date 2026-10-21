@@ -15,6 +15,7 @@ import { db, storage } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { deleteAllVersions } from '../lib/versions.js'
 import { getCloudinaryConfig, uploadToCloudinary, RetryLater } from '../lib/cloudinary.js'
+import { saveFsImage, deleteFsImage, isFsRef, TooBigForFirestore } from '../lib/fsImages.js'
 import { precacheAttachments } from '../lib/offlinePrecache.js'
 import { isLocalRef, putPending, getPending, listPending, putCached } from '../lib/localBlobStore.js'
 
@@ -33,10 +34,17 @@ function refsInNote(note) {
   return out
 }
 
-// Pictures go to Cloudinary when it is set up (Settings); everything else
-// (voice memos, documents) and pictures without Cloudinary go to Firebase Storage.
+// Pictures go into Firestore (src/lib/fsImages.js); voice memos and documents
+// go to Firebase Storage.
 async function uploadBlobToStorage(uid, file) {
-  if ((file.type || '').startsWith('image/') && getCloudinaryConfig()) return uploadToCloudinary(file)
+  if ((file.type || '').startsWith('image/')) {
+    // Pictures live in Firestore (works offline, free). Only a picture that
+    // cannot be shrunk small enough falls back to Cloudinary / Storage.
+    try { return await saveFsImage(uid, file) } catch (err) {
+      if (!(err instanceof TooBigForFirestore)) throw err
+      if (getCloudinaryConfig()) return uploadToCloudinary(file)
+    }
+  }
   const storageRef = ref(storage, `notes/${uid}/${Date.now()}-${file.name}`)
   await uploadBytes(storageRef, file)
   return getDownloadURL(storageRef)
@@ -201,6 +209,8 @@ export function useNotes() {
 
   async function deleteNoteForever(id) {
     try {
+      const gone = notesRef.current.find((n) => n.id === id)
+      for (const s of gone?.images || []) if (isFsRef(s)) deleteFsImage(s)
       deleteDoc(doc(db, 'notes', id)).catch((err) => { console.error('deleteNoteForever sync failed:', err) })
       deleteAllVersions(id) // best-effort, not awaited — subcollection cleanup shouldn't block the delete
     } catch (err) {
@@ -212,7 +222,9 @@ export function useNotes() {
   async function uploadImage(file) {
     if (!user) return { url: null, error: 'Not signed in' }
     try {
-      if (!navigator.onLine) return { url: await putPending(file), error: null }
+      const isImg = (file.type || '').startsWith('image/')
+      // Pictures save to Firestore even offline (queued); other files wait locally.
+      if (!navigator.onLine && !isImg) return { url: await putPending(file), error: null }
       const url = await uploadBlobToStorage(user.uid, file)
       return { url, error: null }
     } catch (err) {
