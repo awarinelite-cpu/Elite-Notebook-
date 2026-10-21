@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, CACHE_SIZE_UNLIMITED } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -27,7 +27,12 @@ export const googleProvider = new GoogleAuthProvider()
 // queued and pushed once connectivity returns. persistentMultipleTabManager
 // lets this stay in sync across multiple open tabs of the app.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+    // Default is a 40 MB cache that Firestore garbage-collects; never evict
+    // notes from the device.
+    cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+  }),
 })
 
 export const storage = getStorage(app)

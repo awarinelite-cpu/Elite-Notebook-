@@ -59,7 +59,7 @@ registerRoute(
       // Every upload gets a unique, never-reused storage path (see
       // uploadImage in useNotes.js), so a cached copy is never stale —
       // this just bounds how much disk space old attachments can use.
-      new ExpirationPlugin({ maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 180, purgeOnQuotaError: true }),
+      new ExpirationPlugin({ maxEntries: 5000, purgeOnQuotaError: true }),
     ],
   })
 )

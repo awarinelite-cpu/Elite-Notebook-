@@ -1,4 +1,5 @@
 import { IconClose, IconEdit, IconTrash } from './Icons.jsx'
+import { AttachmentImg } from './AttachmentMedia.jsx'
 
 export default function ImageLightbox({ images, index, onClose, onNavigate, onEdit, onDelete }) {
   const hasMultiple = images.length > 1
@@ -36,7 +37,7 @@ export default function ImageLightbox({ images, index, onClose, onNavigate, onEd
         </button>
       )}
 
-      <img
+      <AttachmentImg
         className="lightbox-img"
         src={images[index]}
         alt=""

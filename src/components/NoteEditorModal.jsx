@@ -13,6 +13,7 @@ import { extractTextFromImages } from '../lib/ocr.js'
 import { saveVersionIfChanged, snapshotOf } from '../lib/versions.js'
 import { linkifyHtml } from '../lib/linkify.js'
 import VersionHistoryPanel from './VersionHistoryPanel.jsx'
+import { AttachmentImg, AttachmentAudio, AttachmentLink } from './AttachmentMedia.jsx'
 
 const BLANK = { title: '', text: '', checklist: [], color: 'default', background: 'none', labels: [], images: [], audio: [], files: [], reminderAt: null, pinned: false, archived: false }
 
@@ -936,7 +937,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
                       onMouseLeave={handleThumbMouseUpOrLeave}
                       onContextMenu={(e) => e.preventDefault()}
                     >
-                      <img
+                      <AttachmentImg
                         src={srcOf(slot)}
                         alt=""
                         crossOrigin="anonymous"
@@ -984,7 +985,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
                       ) : (
                         <>
                           <IconMic width="16" height="16" />
-                          <audio controls src={clip} style={{ flex: 1, height: 32 }} />
+                          <AttachmentAudio controls src={clip} style={{ flex: 1, height: 32 }} />
                         </>
                       )}
                       <button
@@ -1012,9 +1013,9 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
                     ) : (
                       <>
                         <IconFileDoc width="16" height="16" />
-                        <a href={a.url} target="_blank" rel="noreferrer" className="audio-clip-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <AttachmentLink href={a.url} target="_blank" rel="noreferrer" className="audio-clip-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {a.name} {a.size ? `· ${formatBytes(a.size)}` : ''}
-                        </a>
+                        </AttachmentLink>
                       </>
                     )}
                     <button

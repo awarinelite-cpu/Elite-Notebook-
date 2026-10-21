@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  addDoc,
+  setDoc,
   collection,
   deleteDoc,
   doc,
@@ -15,6 +15,67 @@ import { db, storage } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { deleteAllVersions } from '../lib/versions.js'
 import { precacheAttachments } from '../lib/offlinePrecache.js'
+import { isLocalRef, putPending, getPending, listPending, putCached } from '../lib/localBlobStore.js'
+
+// "local:<id>" refs (files attached while offline) -> uploaded URL, kept so a
+// note that still holds the old ref gets rewritten on a later pass.
+const MAP_KEY = 'elite-local-ref-map'
+const loadMap = () => { try { return JSON.parse(localStorage.getItem(MAP_KEY) || '{}') } catch { return {} } }
+const saveMap = (m) => { try { localStorage.setItem(MAP_KEY, JSON.stringify(m)) } catch { /* ignore */ } }
+let syncingLocal = false
+
+function refsInNote(note) {
+  const out = []
+  for (const s of note.images || []) if (isLocalRef(s)) out.push(s)
+  for (const s of note.audio || []) if (isLocalRef(s)) out.push(s)
+  for (const f of note.files || []) if (isLocalRef(f?.url)) out.push(f.url)
+  return out
+}
+
+async function uploadBlobToStorage(uid, file) {
+  const storageRef = ref(storage, `notes/${uid}/${Date.now()}-${file.name}`)
+  await uploadBytes(storageRef, file)
+  return getDownloadURL(storageRef)
+}
+
+// Uploads files that were attached offline and swaps each "local:" ref in
+// the notes for the real URL. Safe to call repeatedly.
+async function syncLocalRefs(uid, list) {
+  if (syncingLocal) return
+  syncingLocal = true
+  try {
+    const map = loadMap()
+    const wanted = new Set(list.flatMap(refsInNote))
+    if (navigator.onLine) {
+      const have = new Set(await listPending())
+      for (const r of wanted) {
+        if (map[r] || !have.has(r)) continue
+        const rec = await getPending(r)
+        if (!rec) continue
+        try {
+          const file = new File([rec.blob], rec.name, { type: rec.type })
+          const url = await uploadBlobToStorage(uid, file)
+          map[r] = url
+          saveMap(map)
+          await putCached(url, rec.blob)
+        } catch { /* still offline / transient — retry next pass */ }
+      }
+    }
+    const swap = (s) => (isLocalRef(s) && map[s] ? map[s] : s)
+    for (const note of list) {
+      if (!refsInNote(note).some((r) => map[r])) continue
+      const patch = {}
+      if ((note.images || []).some((s) => isLocalRef(s) && map[s])) patch.images = note.images.map(swap)
+      if ((note.audio || []).some((s) => isLocalRef(s) && map[s])) patch.audio = note.audio.map(swap)
+      if ((note.files || []).some((f) => isLocalRef(f?.url) && map[f.url])) {
+        patch.files = note.files.map((f) => (f && isLocalRef(f.url) ? { ...f, url: swap(f.url) } : f))
+      }
+      updateDoc(doc(db, 'notes', note.id), patch).catch(() => {})
+    }
+  } finally {
+    syncingLocal = false
+  }
+}
 
 function sortNotes(list) {
   return [...list].sort((a, b) => {
@@ -34,18 +95,22 @@ export function useNotes() {
   // snapshot metadata (hasPendingWrites / fromCache) plus the browser's own
   // online/offline events, which fire faster than Firestore notices a
   // dropped connection.
+  const notesRef = useRef([])
   const [syncStatus, setSyncStatus] = useState(navigator.onLine ? 'synced' : 'offline')
 
   useEffect(() => {
     function goOffline() { setSyncStatus('offline') }
-    function goOnline() { setSyncStatus((s) => (s === 'offline' ? 'syncing' : s)) }
+    function goOnline() {
+      setSyncStatus((s) => (s === 'offline' ? 'syncing' : s))
+      if (user && notesRef.current.length) syncLocalRefs(user.uid, notesRef.current)
+    }
     window.addEventListener('offline', goOffline)
     window.addEventListener('online', goOnline)
     return () => {
       window.removeEventListener('offline', goOffline)
       window.removeEventListener('online', goOnline)
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
     if (!user) {
@@ -63,6 +128,7 @@ export function useNotes() {
       (snap) => {
         const list = sortNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
         setNotes(list)
+        notesRef.current = list
         setLoading(false)
         setError(null)
         if (!navigator.onLine) setSyncStatus('offline')
@@ -74,6 +140,7 @@ export function useNotes() {
         // images/audio/file attachments offline-ready too, instead of only
         // caching each one the first time it's viewed.
         precacheAttachments(list)
+        syncLocalRefs(user.uid, list)
       },
       (err) => {
         console.error('Notes listener error:', err)
@@ -87,7 +154,11 @@ export function useNotes() {
   async function createNote(data) {
     if (!user) return null
     try {
-      const docRef = await addDoc(collection(db, 'notes'), {
+      // Client-generated id + un-awaited write: Firestore applies it to the
+      // local cache immediately and uploads when the network is back. Awaiting
+      // addDoc would hang offline and the editor would never get an id.
+      const docRef = doc(collection(db, 'notes'))
+      setDoc(docRef, {
         uid: user.uid,
         title: data.title || '',
         text: data.text || '',
@@ -105,7 +176,7 @@ export function useNotes() {
         keepId: data.keepId || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }).catch((err) => { console.error('createNote sync failed:', err); setError(err.message) })
       return docRef.id
     } catch (err) {
       console.error('createNote failed:', err)
@@ -116,7 +187,8 @@ export function useNotes() {
 
   async function updateNote(id, patch) {
     try {
-      await updateDoc(doc(db, 'notes', id), { ...patch, updatedAt: serverTimestamp() })
+      updateDoc(doc(db, 'notes', id), { ...patch, updatedAt: serverTimestamp() })
+        .catch((err) => { console.error('updateNote sync failed:', err); setError(err.message) })
     } catch (err) {
       console.error('updateNote failed:', err)
       setError(err.message)
@@ -125,7 +197,7 @@ export function useNotes() {
 
   async function deleteNoteForever(id) {
     try {
-      await deleteDoc(doc(db, 'notes', id))
+      deleteDoc(doc(db, 'notes', id)).catch((err) => { console.error('deleteNoteForever sync failed:', err) })
       deleteAllVersions(id) // best-effort, not awaited — subcollection cleanup shouldn't block the delete
     } catch (err) {
       console.error('deleteNoteForever failed:', err)
@@ -136,13 +208,15 @@ export function useNotes() {
   async function uploadImage(file) {
     if (!user) return { url: null, error: 'Not signed in' }
     try {
-      const path = `notes/${user.uid}/${Date.now()}-${file.name}`
-      const storageRef = ref(storage, path)
-      await uploadBytes(storageRef, file)
-      const url = await getDownloadURL(storageRef)
+      if (!navigator.onLine) return { url: await putPending(file), error: null }
+      const url = await uploadBlobToStorage(user.uid, file)
       return { url, error: null }
     } catch (err) {
       console.error('uploadImage failed:', err)
+      // Network dropped mid-upload: keep the file on the device and upload later.
+      if (!navigator.onLine || err.code === 'storage/retry-limit-exceeded' || err.code === 'storage/unknown') {
+        try { return { url: await putPending(file), error: null } } catch { /* fall through */ }
+      }
       setError(err.message)
       // Returned directly (not just via state) so callers can show the
       // real message immediately instead of racing a state update.

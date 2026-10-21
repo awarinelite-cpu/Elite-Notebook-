@@ -1,3 +1,5 @@
+// Also saves a permanent copy of each file in IndexedDB (localBlobStore.js),
+// which is what the attachment components read from when offline.
 // Proactively pulls note attachments (images, audio, files) into the same
 // 'note-attachments-v3' cache the service worker already serves offline
 // requests from (see src/sw.js). Without this, an attachment only gets
@@ -10,6 +12,8 @@
 // request and cache a real, readable 200 response (see the crossOrigin fix
 // in ImageLightbox.jsx / NoteEditorModal.jsx for why mode consistency
 // matters here).
+
+import { hasCached, putCached } from './localBlobStore.js'
 
 const ATTACHMENT_ORIGIN = 'https://firebasestorage.googleapis.com'
 const CONCURRENCY = 3
@@ -47,7 +51,9 @@ async function fetchWithLimit(urls) {
       try {
         // 'cors' + 'default' cache mode: let the browser/service worker
         // decide from its own cache before hitting the network.
-        await fetch(url, { mode: 'cors', cache: 'default' })
+        if (await hasCached(url)) continue
+        const res = await fetch(url, { mode: 'cors', cache: 'default' })
+        if (res.ok) await putCached(url, await res.blob())
       } catch {
         // Offline, quota exceeded, or a revoked/expired download token —
         // this is best-effort background work, so just drop it. It'll be

@@ -6,6 +6,7 @@ import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
 import { linkifyHtml } from '../lib/linkify.js'
+import { AttachmentImg, AttachmentAudio, AttachmentLink } from './AttachmentMedia.jsx'
 
 function formatReminder(ts) {
   const d = new Date(ts)
@@ -281,7 +282,7 @@ export default function NoteCard({
 
       {images.length === 1 && (
         <div className={`note-card-image-wrap ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}>
-          <img
+          <AttachmentImg
             src={images[0]}
             alt=""
             onClick={(e) => { e.stopPropagation(); setLightboxIndex(0) }}
@@ -301,7 +302,7 @@ export default function NoteCard({
         >
           {images.slice(0, 6).map((src, i) => (
             <div key={i} className="collage-tile" onClick={() => setLightboxIndex(i)}>
-              <img src={src} alt="" />
+              <AttachmentImg src={src} alt="" />
               {i === 5 && images.length > 6 && (
                 <div className="collage-more">+{images.length - 6}</div>
               )}
@@ -313,7 +314,7 @@ export default function NoteCard({
       {note.audio?.length > 0 && (
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
           {note.audio.map((src, i) => (
-            <audio key={i} controls src={src} style={{ width: '100%', height: 32 }} />
+            <AttachmentAudio key={i} controls src={src} style={{ width: '100%', height: 32 }} />
           ))}
         </div>
       )}
@@ -321,7 +322,7 @@ export default function NoteCard({
       {note.files?.length > 0 && (
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
           {note.files.map((f, i) => (
-            <a
+            <AttachmentLink
               key={i}
               href={f.url}
               target="_blank"
@@ -331,7 +332,7 @@ export default function NoteCard({
             >
               <IconFileDoc width="16" height="16" />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-            </a>
+            </AttachmentLink>
           ))}
         </div>
       )}
