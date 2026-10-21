@@ -58,9 +58,11 @@ jobs:
             npx --yes @bubblewrap/cli update --manifest=./twa-manifest.json --skipVersionUpgrade </dev/null &&
             npx --yes @bubblewrap/cli build --skipPwaValidation </dev/null
           } 2>&1 | tee build.log || {
-            # Surface the last log lines as annotations so failures are readable
-            # without opening the full log.
-            tail -n 9 build.log | sed 's/\x1b\[[0-9;]*m//g' | while IFS= read -r l; do echo "::error::${l:0:200}"; done
+            # Surface the useful part of the failure as one annotation so it
+            # is readable without opening the full log.
+            sed 's/\x1b\[[0-9;]*m//g' build.log > clean.log
+            MSG=$( (grep -n -i -A8 "What went wrong\|Script compilation error\|unable to resolve\|startup failed" clean.log; grep -i -m6 "error\|exception:" clean.log) | head -c 1800 | tr -d '\r' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=TWA build failed::${MSG}"
             exit 1
           }
           ls -la
