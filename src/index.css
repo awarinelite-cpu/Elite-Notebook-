@@ -2197,10 +2197,8 @@ a {
 /* ---------- Note editor image grid (Keep-style, no per-image badges) ---------- */
 .note-editor-image-grid {
   display: grid;
-  gap: 4px;
+  gap: 10px;
   margin: 10px 0 20px;
-  border-radius: 10px;
-  overflow: hidden;
 }
 
 .note-editor-image-grid.grid-1 { grid-template-columns: 1fr; }
@@ -2214,6 +2212,8 @@ a {
   position: relative;
   aspect-ratio: 1;
   overflow: hidden;
+  min-width: 0;
+  border-radius: 12px;
 }
 
 .note-editor-image-grid .thumb-wrap img {
