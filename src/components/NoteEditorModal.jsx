@@ -916,7 +916,7 @@ const NoteEditorModal = forwardRef(function NoteEditorModal({ note, liveNote, in
           </div>
         )}
         {(images.length > 0 || audioClips.length > 0 || attachments.length > 0) && (
-          <div className="note-editor-attachments" style={{ marginTop: 0 }}>
+          <div className="note-editor-attachments" style={{ marginTop: 16 }}>
             {images.length > 0 && (
               <div className={`note-editor-image-grid grid-${Math.min(images.length, 6)}`} style={{ margin: 0 }}>
                 {images.map((slot, i) => {
