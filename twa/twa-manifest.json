@@ -16,8 +16,8 @@
   "startUrl": "/",
   "iconUrl": "https://elite-notebook.vercel.app/icon-512.png",
   "maskableIconUrl": "https://elite-notebook.vercel.app/icon-maskable-512.png",
-  "appVersion": "2",
-  "appVersionCode": 2,
+  "appVersion": "3",
+  "appVersionCode": 3,
   "signingKey": {
     "path": "./android.keystore",
     "alias": "elitenotebook"
@@ -45,15 +45,13 @@
           "accept": [
             "image/*",
             "application/pdf",
-            ".doc",
-            ".docx",
-            ".xls",
-            ".xlsx",
-            ".ppt",
-            ".pptx",
-            ".txt",
-            ".csv",
-            "text/*"
+            "text/*",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
           ]
         }
       ]
