@@ -45,8 +45,18 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          npx --yes @bubblewrap/cli build --skipPwaValidation --skipSigning=false </dev/null || \
-          (yes | npx --yes @bubblewrap/cli build --skipPwaValidation)
+          set -o pipefail
+          {
+            # 'update' generates the Android project from twa-manifest.json;
+            # 'build' then compiles and signs it.
+            npx --yes @bubblewrap/cli update --manifest=./twa-manifest.json --skipVersionUpgrade </dev/null &&
+            npx --yes @bubblewrap/cli build --skipPwaValidation </dev/null
+          } 2>&1 | tee build.log || {
+            # Surface the last log lines as annotations so failures are readable
+            # without opening the full log.
+            tail -n 9 build.log | sed 's/\x1b\[[0-9;]*m//g' | while IFS= read -r l; do echo "::error::${l:0:200}"; done
+            exit 1
+          }
           ls -la
 
       - name: Update assetlinks.json with this key's fingerprint
