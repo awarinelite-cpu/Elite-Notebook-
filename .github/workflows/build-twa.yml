@@ -52,6 +52,8 @@ jobs:
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
+          # Gradle refuses to run when ANDROID_HOME and ANDROID_SDK_ROOT differ.
+          export ANDROID_HOME="$HOME/android-sdk" ANDROID_SDK_ROOT="$HOME/android-sdk"
           {
             # 'update' generates the Android project from twa-manifest.json;
             # 'build' then compiles and signs it.
