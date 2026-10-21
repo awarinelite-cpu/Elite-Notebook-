@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useAttachmentSrc } from '../hooks/useAttachmentSrc.js'
+import { cloudinarySrc } from '../lib/cloudinary.js'
 
 // Drop-in <img>/<audio>/<a> that load from the on-device copy of an
 // attachment when one exists (and for files still waiting to upload), so
 // they work with no network.
-export function AttachmentImg({ src, onError, ...rest }) {
-  const resolved = useAttachmentSrc(src)
+export function AttachmentImg({ src, optimize, onError, ...rest }) {
+  const local = useAttachmentSrc(src)
+  // Cloudinary links are served resized/compressed when no on-device copy exists.
+  const resolved = optimize !== undefined && local === src ? cloudinarySrc(src, optimize) : local
   const [failed, setFailed] = useState(null)
   // Show a visible placeholder (instead of a browser broken-image icon) and
   // log the failing URL so the cause can be diagnosed.

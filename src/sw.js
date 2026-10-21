@@ -64,6 +64,17 @@ registerRoute(
   })
 )
 
+registerRoute(
+  ({ url }) => url.origin === 'https://res.cloudinary.com',
+  new CacheFirst({
+    cacheName: 'cloudinary-images',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({ maxEntries: 5000, purgeOnQuotaError: true }),
+    ],
+  })
+)
+
 // Web Share Target: the manifest's share_target.action points here. Android
 // (and any OS honoring the Web Share Target spec) will POST the shared
 // title/text/url/files to this URL when the person picks this app from a

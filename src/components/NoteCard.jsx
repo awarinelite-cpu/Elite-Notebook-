@@ -284,6 +284,7 @@ export default function NoteCard({
         <div className={`note-card-image-wrap ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}>
           <AttachmentImg
             src={images[0]}
+            optimize={null}
             alt=""
             onClick={(e) => { e.stopPropagation(); setLightboxIndex(0) }}
           />
@@ -302,7 +303,7 @@ export default function NoteCard({
         >
           {images.slice(0, 6).map((src, i) => (
             <div key={i} className="collage-tile" onClick={() => setLightboxIndex(i)}>
-              <AttachmentImg src={src} alt="" />
+              <AttachmentImg src={src} optimize={400} alt="" />
               {i === 5 && images.length > 6 && (
                 <div className="collage-more">+{images.length - 6}</div>
               )}

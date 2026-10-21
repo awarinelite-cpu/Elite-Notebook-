@@ -15,7 +15,7 @@
 
 import { hasCached, putCached } from './localBlobStore.js'
 
-const ATTACHMENT_ORIGIN = 'https://firebasestorage.googleapis.com'
+const ATTACHMENT_ORIGINS = ['https://firebasestorage.googleapis.com', 'https://res.cloudinary.com']
 const CONCURRENCY = 3
 
 // Tracks URLs already attempted this session so repeated Firestore snapshot
@@ -32,7 +32,7 @@ function collectAttachmentUrls(notes) {
         const url = typeof entry === 'string' ? entry : null
         if (!url) continue // skip in-flight upload placeholders ({id, previewUrl})
         try {
-          if (new URL(url).origin === ATTACHMENT_ORIGIN) urls.add(url)
+          if (ATTACHMENT_ORIGINS.includes(new URL(url).origin)) urls.add(url)
         } catch {
           // not a real URL — ignore
         }

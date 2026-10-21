@@ -14,6 +14,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { deleteAllVersions } from '../lib/versions.js'
+import { getCloudinaryConfig, uploadToCloudinary, RetryLater } from '../lib/cloudinary.js'
 import { precacheAttachments } from '../lib/offlinePrecache.js'
 import { isLocalRef, putPending, getPending, listPending, putCached } from '../lib/localBlobStore.js'
 
@@ -32,7 +33,10 @@ function refsInNote(note) {
   return out
 }
 
+// Pictures go to Cloudinary when it is set up (Settings); everything else
+// (voice memos, documents) and pictures without Cloudinary go to Firebase Storage.
 async function uploadBlobToStorage(uid, file) {
+  if ((file.type || '').startsWith('image/') && getCloudinaryConfig()) return uploadToCloudinary(file)
   const storageRef = ref(storage, `notes/${uid}/${Date.now()}-${file.name}`)
   await uploadBytes(storageRef, file)
   return getDownloadURL(storageRef)
@@ -214,7 +218,7 @@ export function useNotes() {
     } catch (err) {
       console.error('uploadImage failed:', err)
       // Network dropped mid-upload: keep the file on the device and upload later.
-      if (!navigator.onLine || err.code === 'storage/retry-limit-exceeded' || err.code === 'storage/unknown') {
+      if (!navigator.onLine || err instanceof RetryLater || err.code === 'storage/retry-limit-exceeded' || err.code === 'storage/unknown') {
         try { return { url: await putPending(file), error: null } } catch { /* fall through */ }
       }
       setError(err.message)

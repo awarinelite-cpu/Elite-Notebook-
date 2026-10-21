@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext.jsx'
 import { useInstallPrompt } from '../hooks/useInstallPrompt.js'
 import { IconSignOut, IconMoon, IconSun, IconLock, IconDownload, IconFingerprint } from './Icons.jsx'
 import { PinModal } from './SecurityLock.jsx'
+import { readSavedCloudinaryConfig, saveCloudinaryConfig, getCloudinaryConfig } from '../lib/cloudinary.js'
 
 const rowStyle = {
   display: 'flex',
@@ -25,6 +26,10 @@ export default function SettingsPanel({ security }) {
   const [pinModal, setPinModal] = useState(null) // 'setup' | 'change' | 'remove' | null
   const [bioBusy, setBioBusy] = useState(false)
   const [bioError, setBioError] = useState('')
+  const savedCld = readSavedCloudinaryConfig()
+  const [cloud, setCloud] = useState(savedCld.cloud || '')
+  const [preset, setPreset] = useState(savedCld.preset || '')
+  const [cldMsg, setCldMsg] = useState(getCloudinaryConfig() ? 'Picture hosting is on.' : '')
 
   async function toggleBiometric() {
     setBioError('')
@@ -122,6 +127,36 @@ export default function SettingsPanel({ security }) {
           </div>
         </div>
       )}
+
+      <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+        <b>Picture hosting (Cloudinary)</b>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>
+          New pictures are shrunk, uploaded to Cloudinary and saved as a link on the note.
+        </div>
+        <input value={cloud} onChange={(e) => setCloud(e.target.value)} autoCapitalize="none" placeholder="Cloud name, e.g. dxyz123abc"
+          style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'inherit' }} />
+        <input value={preset} onChange={(e) => setPreset(e.target.value)} autoCapitalize="none" placeholder="Unsigned upload preset name"
+          style={{ padding: 10, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'inherit' }} />
+        <button
+          style={{ ...rowStyle, marginBottom: 0, justifyContent: 'center' }}
+          onClick={() => {
+            saveCloudinaryConfig(cloud, preset)
+            setCldMsg(cloud.trim() && preset.trim() ? 'Saved. New pictures will upload to Cloudinary.' : 'Cleared. Pictures use Firebase Storage.')
+          }}
+        >
+          Save picture hosting
+        </button>
+        {cldMsg && <div style={{ fontSize: 12.5 }}>{cldMsg}</div>}
+        <details style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>
+          <summary>How to get these two values</summary>
+          <ol style={{ paddingLeft: 18 }}>
+            <li>Create a free account at cloudinary.com.</li>
+            <li>Your cloud name is on the dashboard.</li>
+            <li>Settings, Upload, Upload presets, Add upload preset. Set Signing mode to Unsigned and save.</li>
+            <li>Paste the cloud name and the preset name above.</li>
+          </ol>
+        </details>
+      </div>
 
       {security && !security.loading && (
         <>
