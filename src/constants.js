@@ -49,6 +49,27 @@ export function getNoteColors(theme) {
   return NOTE_COLORS_LIGHT
 }
 
+// Helpers for the scenic wallpapers below — still pure CSS (no image assets).
+const STARS = `radial-gradient(circle at 12% 18%, rgba(255,255,255,0.95) 0 1.4px, transparent 1.5px),
+  radial-gradient(circle at 34% 8%, rgba(255,255,255,0.8) 0 1px, transparent 1.1px),
+  radial-gradient(circle at 58% 24%, rgba(255,255,255,0.85) 0 1.3px, transparent 1.4px),
+  radial-gradient(circle at 88% 12%, rgba(255,255,255,0.9) 0 1.2px, transparent 1.3px),
+  radial-gradient(circle at 76% 40%, rgba(255,255,255,0.6) 0 1px, transparent 1.1px),
+  radial-gradient(circle at 22% 46%, rgba(255,255,255,0.7) 0 1px, transparent 1.1px)`
+
+// A row of skyscrapers: [left%, width%, height%] each, drawn as flat blocks
+// anchored to the bottom, with optional lit-window stripes and roof spires.
+function skyline(buildings, body, windows) {
+  const pos = (l, w) => (w >= 100 ? 0 : (l * 100) / (100 - w))
+  const layers = []
+  for (const [l, w, h] of buildings) {
+    if (windows) layers.push(`repeating-linear-gradient(0deg, ${windows} 0 1.6px, transparent 1.6px 6px) ${pos(l, w)}% 100% / ${w}% ${h}% no-repeat`)
+    if (h >= 45) layers.push(`linear-gradient(${body}, ${body}) ${pos(l + w / 2 - 0.4, 0.8)}% 100% / 0.8% ${h + 7}% no-repeat`)
+  }
+  for (const [l, w, h] of buildings) layers.push(`linear-gradient(${body}, ${body}) ${pos(l, w)}% 100% / ${w}% ${h}% no-repeat`)
+  return layers.join(',\n  ')
+}
+
 // Wallpaper backgrounds — an alternative to flat colors. Pure CSS
 // gradients/patterns (no image assets), so they're crisp at any size,
 // theme-safe, and don't need network or storage. When a note has a
@@ -88,6 +109,74 @@ export const NOTE_BACKGROUNDS = {
               radial-gradient(circle at 90% 85%, rgba(255,255,255,0.55) 0 1px, transparent 1.1px),
               linear-gradient(170deg, #040914 0%, #0B1C3D 45%, #123E5E 100%)`,
   savanna: 'linear-gradient(160deg, #FDEBA8 0%, #F2A65A 42%, #B5651D 75%, #4E3524 100%)',
+  // --- Earth & space ---
+  earth: `radial-gradient(ellipse 22% 7% at 36% 76%, rgba(80,185,100,0.85) 0 70%, transparent 100%),
+          radial-gradient(ellipse 16% 6% at 66% 70%, rgba(80,185,100,0.7) 0 70%, transparent 100%),
+          radial-gradient(ellipse 140% 55% at 50% 112%, #0B3A80 0%, #1E6BD0 70%, #5FB4FF 93%, #CFEAFF 97%, transparent 100%),
+          ${STARS},
+          linear-gradient(180deg, #01030A 0%, #06122B 100%)`,
+  earthrise: `radial-gradient(circle 52px at 74% 24%, #1E6BD0 0 80%, #7CC4FF 94%, rgba(124,196,255,0) 100%),
+              radial-gradient(circle 110px at 74% 24%, rgba(100,180,255,0.25) 0%, transparent 100%),
+              radial-gradient(ellipse 170% 26% at 40% 128%, #9A9AA2 0 66%, #5A5A62 96%, transparent 100%),
+              ${STARS},
+              linear-gradient(180deg, #000000 0%, #0A0F1E 100%)`,
+
+  // --- Sea & ocean ---
+  deepocean: `repeating-linear-gradient(105deg, rgba(255,255,255,0.08) 0 14px, transparent 14px 46px) 0 0 / 100% 50% no-repeat,
+              radial-gradient(circle at 30% 62%, rgba(255,255,255,0.35) 0 3px, transparent 4px),
+              radial-gradient(circle at 34% 54%, rgba(255,255,255,0.25) 0 2px, transparent 3px),
+              radial-gradient(circle at 72% 78%, rgba(255,255,255,0.3) 0 4px, transparent 5px),
+              linear-gradient(180deg, #1B9BD8 0%, #0A5C9E 30%, #06305E 65%, #020E22 100%)`,
+  waves: `radial-gradient(ellipse 55% 8% at 22% 70%, rgba(255,255,255,0.3) 0 70%, transparent 72%),
+          radial-gradient(ellipse 60% 8% at 76% 80%, rgba(255,255,255,0.24) 0 70%, transparent 72%),
+          radial-gradient(ellipse 50% 7% at 38% 91%, rgba(255,255,255,0.2) 0 70%, transparent 72%),
+          linear-gradient(180deg, #A5ECF5 0%, #23A9DA 35%, #0B63A5 70%, #06305E 100%)`,
+  lagoon: 'linear-gradient(170deg, #E8FFF7 0%, #8FF0D8 25%, #35C7C0 55%, #1388B0 85%, #0A4F80 100%)',
+  sunsetsea: `radial-gradient(circle 64px at 50% 56%, #FFF6D5 0 40%, rgba(255,190,110,0.6) 72%, transparent 100%),
+              linear-gradient(90deg, transparent 43%, rgba(255,214,150,0.5) 50%, transparent 57%) 0 100% / 100% 44% no-repeat,
+              linear-gradient(180deg, #2B1B5A 0%, #C2477E 33%, #FF9966 54%, #1B5C8A 56%, #0B2E52 100%)`,
+  beach: 'linear-gradient(180deg, #BFE6FF 0%, #E6F6FF 30%, #5CC8D8 40%, #2FA6C4 55%, #F6EBC3 63%, #E8CF93 100%)',
+  stormsea: `repeating-linear-gradient(8deg, rgba(255,255,255,0.1) 0 3px, transparent 3px 18px) 0 62% / 100% 38% no-repeat,
+             linear-gradient(180deg, #3A4558 0%, #5B6B80 38%, #2F4A5F 40%, #1B3144 70%, #0B1A2A 100%)`,
+
+  // --- Landscapes ---
+  alpine: `radial-gradient(ellipse 130% 20% at 30% 110%, #3F7D3A 0 98%, transparent 100%),
+           conic-gradient(from 135deg at 50% 0%, #4C5D85 0 90deg, transparent 90deg) 10px 100% / 120px 60px repeat-x,
+           conic-gradient(from 135deg at 50% 0%, #8FA3C9 0 90deg, transparent 90deg) 50px 100% / 190px 95px repeat-x,
+           linear-gradient(180deg, #7EC8F7 0%, #CBEBFF 55%, #F5E9D0 100%)`,
+  hills: `radial-gradient(ellipse 120% 22% at 15% 108%, #2E6B34 0 98%, transparent 100%),
+          radial-gradient(ellipse 100% 24% at 90% 102%, #4C9A4A 0 98%, transparent 100%),
+          radial-gradient(ellipse 140% 26% at 50% 88%, #8CC768 0 98%, transparent 100%),
+          radial-gradient(circle at 78% 18%, rgba(255,250,215,0.95) 0 22px, rgba(255,240,170,0.35) 60px, transparent 120px),
+          linear-gradient(180deg, #8ED1F5 0%, #D8F1FF 65%, #F3F9E3 100%)`,
+  dunes: `radial-gradient(ellipse 90% 24% at 8% 108%, #A94A1B 0 98%, transparent 100%),
+          radial-gradient(ellipse 80% 22% at 88% 102%, #D9772F 0 98%, transparent 100%),
+          radial-gradient(ellipse 110% 26% at 45% 84%, #EFA45A 0 98%, transparent 100%),
+          linear-gradient(180deg, #FFE3B3 0%, #FFC98A 40%, #F29B5B 100%)`,
+  polarnight: `linear-gradient(110deg, transparent 15%, rgba(0,255,170,0.38) 38%, rgba(120,90,255,0.32) 62%, transparent 85%) 0 0 / 100% 62% no-repeat,
+               radial-gradient(ellipse 130% 16% at 50% 112%, #E8F2FF 0 98%, transparent 100%),
+               conic-gradient(from 135deg at 50% 0%, #0A1224 0 90deg, transparent 90deg) 0 100% / 150px 75px repeat-x,
+               ${STARS},
+               linear-gradient(180deg, #020813 0%, #08233A 60%, #0B2B3F 100%)`,
+  autumnvalley: `radial-gradient(ellipse 120% 22% at 20% 108%, #8A3B12 0 98%, transparent 100%),
+                 radial-gradient(ellipse 100% 24% at 85% 104%, #C8571A 0 98%, transparent 100%),
+                 conic-gradient(from 135deg at 50% 0%, #7B5A8C 0 90deg, transparent 90deg) 20px 100% / 160px 80px repeat-x,
+                 linear-gradient(180deg, #FFE8C2 0%, #F9C88C 50%, #F7A56A 100%)`,
+
+  // --- Skyscrapers ---
+  skyline: `${skyline([[2,10,34],[14,8,48],[30,9,30],[58,8,40],[74,10,32],[88,9,44]], '#6B5B9A')},
+  ${skyline([[0,11,52],[10,8,40],[19,10,64],[32,7,46],[41,11,72],[53,8,50],[62,10,60],[73,8,44],[82,9,68],[92,8,48]], '#1E1B3F')},
+  linear-gradient(180deg, #FFB88C 0%, #F6A5C0 35%, #8E7CC3 70%, #3B3A7A 100%)`,
+  citynight: `${skyline([[0,11,52],[10,8,40],[19,10,64],[32,7,46],[41,11,72],[53,8,50],[62,10,60],[73,8,44],[82,9,68],[92,8,48]], '#0A1128', 'rgba(255,214,120,0.55)')},
+  ${skyline([[4,9,36],[16,8,50],[34,9,34],[56,8,44],[70,10,38],[86,9,48]], '#16224A')},
+  ${STARS},
+  linear-gradient(180deg, #050A1A 0%, #0F1D45 70%, #1B2F66 100%)`,
+  metropolis: `${skyline([[0,11,58],[11,8,44],[20,10,70],[33,7,50],[42,11,78],[54,8,54],[63,10,64],[74,8,48],[83,9,72],[93,8,52]], '#274E78', 'rgba(190,225,255,0.35)')},
+  ${skyline([[5,9,40],[17,8,54],[35,9,38],[57,8,48],[71,10,42],[87,9,52]], '#8FB6DA')},
+  linear-gradient(180deg, #5FAEEF 0%, #A9D8F8 55%, #E4F4FF 100%)`,
+  neoncity: `${skyline([[0,11,52],[10,8,40],[19,10,64],[32,7,46],[41,11,72],[53,8,50],[62,10,60],[73,8,44],[82,9,68],[92,8,48]], '#120B2E', 'rgba(0,229,255,0.55)')},
+  ${skyline([[4,9,38],[16,8,52],[34,9,36],[56,8,46],[70,10,40],[86,9,50]], '#2A1B5E')},
+  linear-gradient(180deg, #0F0C29 0%, #302B63 50%, #B8337A 100%)`,
 }
 
 export const NOTE_BACKGROUND_LABELS = {
@@ -107,4 +196,21 @@ export const NOTE_BACKGROUND_LABELS = {
   horizon: 'Horizon',
   starfield: 'Starfield',
   savanna: 'Savanna',
+  earth: 'Earth from space',
+  earthrise: 'Earthrise',
+  deepocean: 'Deep ocean',
+  waves: 'Waves',
+  lagoon: 'Lagoon',
+  sunsetsea: 'Sunset sea',
+  beach: 'Beach',
+  stormsea: 'Stormy sea',
+  alpine: 'Alpine peaks',
+  hills: 'Green hills',
+  dunes: 'Desert dunes',
+  polarnight: 'Polar night',
+  autumnvalley: 'Autumn valley',
+  skyline: 'Skyline dusk',
+  citynight: 'City at night',
+  metropolis: 'Metropolis',
+  neoncity: 'Neon city',
 }
