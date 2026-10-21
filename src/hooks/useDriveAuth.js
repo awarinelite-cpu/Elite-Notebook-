@@ -6,6 +6,7 @@ import {
   loadActiveAccountEmail,
   saveActiveAccountEmail,
   requestDriveToken,
+  consumeRedirectResult,
 } from '../lib/googleDrive.js'
 
 // Manages every linked Google Drive account at once. `active` is whichever
@@ -61,6 +62,19 @@ export function useDriveAuth() {
       setConnecting(false)
     }
   }, [upsertAccount])
+
+  // Finishes a full-page OAuth redirect (used inside the TWA, where the
+  // Google popup can't open): the token comes back in the URL hash.
+  useEffect(() => {
+    consumeRedirectResult()
+      .then((session) => {
+        if (!session?.email) return
+        upsertAccount(session)
+        setActiveEmail(session.email)
+      })
+      .catch(() => setError('connect-failed'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Refreshes one specific account's token (silently if possible).
   const reconnect = useCallback(

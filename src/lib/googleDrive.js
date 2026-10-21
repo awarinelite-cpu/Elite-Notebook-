@@ -108,6 +108,70 @@ async function fetchEmail(accessToken) {
   }
 }
 
+
+// A TWA (installed Chrome-based Android app) is not a Capacitor native app, so
+// it takes the web flow — but Google's token popup can't open there, and its
+// callbacks never fire, leaving the UI stuck on "Connecting…". In that case we
+// use a full-page OAuth redirect instead (implicit flow, token in the URL hash).
+export function isTwa() {
+  if (Capacitor.isNativePlatform()) return false
+  try {
+    if (document.referrer && document.referrer.startsWith('android-app://')) return true
+    return !!window.matchMedia?.('(display-mode: standalone)').matches
+  } catch {
+    return false
+  }
+}
+
+const OAUTH_STATE_KEY = 'elite-notebook:drive-oauth-state'
+
+function startRedirectAuth({ loginHint, selectAccount }) {
+  const state = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  localStorage.setItem(OAUTH_STATE_KEY, state)
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: window.location.origin + '/',
+    response_type: 'token',
+    scope: SCOPE,
+    include_granted_scopes: 'true',
+    state,
+    prompt: loginHint ? 'consent' : selectAccount ? 'select_account consent' : 'consent',
+  })
+  if (loginHint) params.set('login_hint', loginHint)
+  window.location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString())
+  // Page navigates away; never resolve.
+  return new Promise(() => {})
+}
+
+// Call once on startup. If the URL hash carries an OAuth redirect result,
+// turns it into a Drive session (and cleans the URL). Returns null otherwise.
+export async function consumeRedirectResult() {
+  const hash = window.location.hash
+  if (!hash || !hash.includes('state=')) return null
+  const p = new URLSearchParams(hash.replace(/^#/, ''))
+  const expected = localStorage.getItem(OAUTH_STATE_KEY)
+  if (!expected || p.get('state') !== expected) return null
+  localStorage.removeItem(OAUTH_STATE_KEY)
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+  const token = p.get('access_token')
+  if (!token) return null
+  const profile = await fetchEmail(token)
+  return {
+    accessToken: token,
+    expiresAt: Date.now() + (Number(p.get('expires_in')) || 3300) * 1000,
+    email: profile?.email || null,
+    name: profile?.name || null,
+    picture: profile?.picture || null,
+    scopeVersion: SCOPE_VERSION,
+  }
+}
+
+function withTimeout(promise, ms) {
+  let t
+  const timeout = new Promise((_, reject) => { t = setTimeout(() => reject(new Error('timeout')), ms) })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t))
+}
+
 const NATIVE_SCOPES = ['https://www.googleapis.com/auth/drive', 'email', 'profile']
 
 async function requestDriveTokenNative() {
@@ -143,7 +207,14 @@ export function requestDriveToken({ interactive = true, loginHint, selectAccount
   if (Capacitor.isNativePlatform()) {
     return requestDriveTokenNative()
   }
-  return loadScript().then(
+  if (isTwa()) {
+    // No silent refresh possible without a popup; the UI shows Reconnect instead.
+    if (!interactive) return Promise.reject(new Error('silent-unsupported'))
+    if (!CLIENT_ID) return Promise.reject(new Error('missing-client-id'))
+    return startRedirectAuth({ loginHint, selectAccount })
+  }
+  // Timeout so a popup that never reports back can't leave "Connecting…" stuck.
+  return withTimeout(loadScript().then(
     () =>
       new Promise((resolve, reject) => {
         if (!CLIENT_ID) {
@@ -183,5 +254,5 @@ export function requestDriveToken({ interactive = true, loginHint, selectAccount
           hint: loginHint || undefined,
         })
       })
-  )
+  ), interactive ? 120000 : 10000)
 }
