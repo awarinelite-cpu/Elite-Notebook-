@@ -9,7 +9,7 @@ import { transferItems } from '../lib/driveTransfer.js'
 import DriveFolderIcon from './DriveFolderIcon.jsx'
 import DriveAccountSwitcher from './DriveAccountSwitcher.jsx'
 import DriveFolderPicker from './DriveFolderPicker.jsx'
-import { IconSearch, IconClose, IconPlus, IconImage, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause, IconShare, IconFileDoc, IconAttachment } from './Icons.jsx'
+import { IconSearch, IconClose, IconPlus, IconImage, IconFolderUp, IconGrid, IconList, IconCheck, IconCopyTo, IconMoveTo, IconTrash, IconPlay, IconPause, IconShare, IconFileDoc, IconAttachment } from './Icons.jsx'
 
 const DEFAULT_FOLDER_COLOR = '#8a8f99'
 
@@ -387,6 +387,7 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [preparedShare, setPreparedShare] = useState(null) // { files: [{name, blob}] } — gathered files waiting on a fresh tap to share
   const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
+  const folderInput = useRef(null)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
 
@@ -649,6 +650,72 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     ).then(() => {
       if (failed) setActionError(`${failed} file${failed > 1 ? 's' : ''} failed to upload.`)
     })
+  }
+
+  // Upload a whole folder (picked via <input webkitdirectory>), recreating its
+  // sub-folder structure inside the current Drive folder.
+  async function handleFolderPick(e) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!picked.length) return
+    setActionError(null)
+
+    const relPath = (f) => f.webkitRelativePath || f.name
+    const rootParent = currentFolder?.id
+
+    // Unique directory paths, parents before children.
+    const dirSet = new Set()
+    for (const f of picked) {
+      const parts = relPath(f).split('/')
+      parts.pop()
+      for (let i = 1; i <= parts.length; i++) dirSet.add(parts.slice(0, i).join('/'))
+    }
+    const dirs = Array.from(dirSet).sort((a, b) => a.split('/').length - b.split('/').length)
+
+    const total = picked.length
+    let done = 0
+    let failed = 0
+    const folderIds = new Map()
+    setActionNotice(`Preparing folders…`)
+
+    try {
+      for (const dir of dirs) {
+        const parts = dir.split('/')
+        const name = parts[parts.length - 1]
+        const parentId = parts.length > 1 ? folderIds.get(parts.slice(0, -1).join('/')) : rootParent
+        const folder = await createFolder(accessToken, name, parentId)
+        folderIds.set(dir, folder.id)
+        if (parts.length === 1) setFiles((list) => [folder, ...(list || [])])
+      }
+    } catch (err) {
+      setActionNotice(null)
+      setActionError(`Could not create folders: ${err.message}`)
+      return
+    }
+
+    setActionNotice(`Uploading 0 of ${total} files…`)
+    const queue = picked.slice()
+    const worker = async () => {
+      while (queue.length) {
+        const file = queue.shift()
+        const parts = relPath(file).split('/')
+        parts.pop()
+        const parentId = parts.length ? folderIds.get(parts.join('/')) : rootParent
+        try {
+          await uploadFile(accessToken, file, parentId)
+        } catch {
+          failed++
+        }
+        done++
+        setActionNotice(`Uploading ${done} of ${total} files…`)
+      }
+    }
+    await Promise.all([worker(), worker(), worker()])
+
+    setActionNotice(null)
+    if (failed) setActionError(`${failed} of ${total} file${total > 1 ? 's' : ''} failed to upload.`)
+    else setActionNotice(`Uploaded ${total} file${total > 1 ? 's' : ''}.`)
+    refreshCurrentFolder()
   }
 
   async function handleDeleteSelected() {
@@ -1051,6 +1118,18 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
                     <IconImage width="16" height="16" /> Upload here
                   </button>
                   <input ref={uploadInput} type="file" multiple hidden onChange={handleUploadPick} />
+                  <button className="drive-action-btn" onClick={() => folderInput.current?.click()}>
+                    <IconFolderUp width="16" height="16" /> Upload folder
+                  </button>
+                  <input
+                    ref={folderInput}
+                    type="file"
+                    hidden
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                    onChange={handleFolderPick}
+                  />
                 </>
               ) : (
                 <form className="drive-new-folder-form" onSubmit={submitNewFolder}>

@@ -42,6 +42,9 @@ export function IconHelp(p) { return (
 export function IconImage(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5-4 4-2-2-6 6" /></svg>
 )}
+export function IconFolderUp(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" /><path d="M12 16v-5m0 0-2 2m2-2 2 2" /></svg>
+)}
 export function IconDrawing(p) { return (
   <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M4 20l1-4 11-11 3 3-11 11-4 1Z" /><path d="M14 6.5 17.5 10" /></svg>
 )}
