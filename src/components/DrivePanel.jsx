@@ -388,6 +388,8 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
   const [driveEmailHint, setDriveEmailHint] = useState('')
   const uploadInput = useRef(null)
   const folderInput = useRef(null)
+  const folderUploadChain = useRef(Promise.resolve())
+  const [dragOver, setDragOver] = useState(false)
 
   const currentFolder = folderStack[folderStack.length - 1] || null
 
@@ -654,14 +656,69 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
 
   // Upload a whole folder (picked via <input webkitdirectory>), recreating its
   // sub-folder structure inside the current Drive folder.
-  async function handleFolderPick(e) {
+  function handleFolderPick(e) {
     const picked = Array.from(e.target.files || [])
     e.target.value = ''
     if (!picked.length) return
-    setActionError(null)
+    enqueueFolderUpload(picked.map((file) => ({ file, rel: file.webkitRelativePath || file.name })))
+  }
 
-    const relPath = (f) => f.webkitRelativePath || f.name
+  // Uploads run one batch at a time, so you can pick or drop more folders
+  // while earlier ones are still uploading — they simply queue up.
+  function enqueueFolderUpload(items) {
+    if (!items.length) return
     const rootParent = currentFolder?.id
+    folderUploadChain.current = folderUploadChain.current
+      .catch(() => {})
+      .then(() => runFolderUpload(items, rootParent))
+  }
+
+  // Read dropped files/folders (any number of them) into [{file, rel}].
+  async function handleFolderDrop(e) {
+    e.preventDefault()
+    setDragOver(false)
+    const entries = Array.from(e.dataTransfer.items || [])
+      .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
+      .filter(Boolean)
+    if (!entries.length) return
+    const items = []
+    const readAll = (reader) =>
+      new Promise((resolve, reject) => {
+        const all = []
+        const next = () =>
+          reader.readEntries((batch) => {
+            if (!batch.length) return resolve(all)
+            all.push(...batch)
+            next()
+          }, reject)
+        next()
+      })
+    const walk = async (entry, prefix) => {
+      if (entry.isFile) {
+        const file = await new Promise((res, rej) => entry.file(res, rej))
+        items.push({ file, rel: prefix + entry.name })
+      } else if (entry.isDirectory) {
+        const children = await readAll(entry.createReader())
+        for (const child of children) await walk(child, `${prefix}${entry.name}/`)
+      }
+    }
+    setActionNotice('Reading dropped folders…')
+    try {
+      for (const entry of entries) await walk(entry, '')
+    } catch (err) {
+      setActionNotice(null)
+      setActionError(`Could not read dropped folders: ${err.message}`)
+      return
+    }
+    setActionNotice(null)
+    enqueueFolderUpload(items)
+  }
+
+  async function runFolderUpload(items, rootParent) {
+    setActionError(null)
+    const picked = items.map((i) => i.file)
+    const relMap = new Map(items.map((i) => [i.file, i.rel]))
+    const relPath = (f) => relMap.get(f)
 
     // Unique directory paths, parents before children.
     const dirSet = new Set()
@@ -1150,6 +1207,25 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
                   </button>
                 </form>
               )}
+            </div>
+          )}
+
+          {!search && !creatingFolder && (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleFolderDrop}
+              style={{
+                margin: '8px 0',
+                padding: '12px',
+                textAlign: 'center',
+                fontSize: '13px',
+                borderRadius: '12px',
+                border: `2px dashed ${dragOver ? 'currentColor' : 'rgba(128,128,128,0.5)'}`,
+                opacity: dragOver ? 1 : 0.75,
+              }}
+            >
+              Drag &amp; drop one or more folders here
             </div>
           )}
 
