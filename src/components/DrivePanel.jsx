@@ -660,28 +660,48 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
     const picked = Array.from(e.target.files || [])
     e.target.value = ''
     if (!picked.length) return
-    enqueueFolderUpload(picked.map((file) => ({ file, rel: file.webkitRelativePath || file.name })))
+    // Rebuild the folder tree from each file's relative path.
+    const roots = []
+    const byPath = new Map()
+    const ensureNode = (parts) => {
+      const key = parts.join('/')
+      if (byPath.has(key)) return byPath.get(key)
+      const node = { name: parts[parts.length - 1], files: [], dirs: [] }
+      byPath.set(key, node)
+      if (parts.length === 1) roots.push(node)
+      else ensureNode(parts.slice(0, -1)).dirs.push(node)
+      return node
+    }
+    const loose = []
+    for (const file of picked) {
+      const parts = (file.webkitRelativePath || file.name).split('/')
+      if (parts.length === 1) loose.push(file)
+      else ensureNode(parts.slice(0, -1)).files.push(file)
+    }
+    enqueueFolderUpload({ roots, loose })
   }
 
   // Uploads run one batch at a time, so you can pick or drop more folders
   // while earlier ones are still uploading — they simply queue up.
-  function enqueueFolderUpload(items) {
-    if (!items.length) return
+  function enqueueFolderUpload(tree) {
+    if (!tree.roots.length && !tree.loose.length) return
     const rootParent = currentFolder?.id
     folderUploadChain.current = folderUploadChain.current
       .catch(() => {})
-      .then(() => runFolderUpload(items, rootParent))
+      .then(() => runFolderUpload(tree, rootParent))
   }
 
-  // Read dropped files/folders (any number of them) into [{file, rel}].
+  // Read dropped files/folders (any number of them) into a real folder tree,
+  // including sub-folders of sub-folders and empty folders.
   async function handleFolderDrop(e) {
     e.preventDefault()
     setDragOver(false)
+    // Grab every entry synchronously — the drag data is only valid right now.
     const entries = Array.from(e.dataTransfer.items || [])
       .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
       .filter(Boolean)
     if (!entries.length) return
-    const items = []
+
     const readAll = (reader) =>
       new Promise((resolve, reject) => {
         const all = []
@@ -693,86 +713,105 @@ const DrivePanel = forwardRef(function DrivePanel(props, ref) {
           }, reject)
         next()
       })
-    const walk = async (entry, prefix) => {
-      if (entry.isFile) {
-        const file = await new Promise((res, rej) => entry.file(res, rej))
-        items.push({ file, rel: prefix + entry.name })
-      } else if (entry.isDirectory) {
-        const children = await readAll(entry.createReader())
-        for (const child of children) await walk(child, `${prefix}${entry.name}/`)
+
+    let unreadable = 0
+    const readDir = async (entry) => {
+      const node = { name: entry.name, files: [], dirs: [] }
+      let children = []
+      try {
+        children = await readAll(entry.createReader())
+      } catch {
+        unreadable++
       }
+      for (const child of children) {
+        if (child.isDirectory) {
+          node.dirs.push(await readDir(child))
+        } else if (child.isFile) {
+          try {
+            node.files.push(await new Promise((res, rej) => child.file(res, rej)))
+          } catch {
+            unreadable++
+          }
+        }
+      }
+      return node
     }
+
+    setActionError(null)
     setActionNotice('Reading dropped folders…')
-    try {
-      for (const entry of entries) await walk(entry, '')
-    } catch (err) {
-      setActionNotice(null)
-      setActionError(`Could not read dropped folders: ${err.message}`)
-      return
+    const tree = { roots: [], loose: [] }
+    for (const entry of entries) {
+      if (entry.isDirectory) tree.roots.push(await readDir(entry))
+      else if (entry.isFile) {
+        try {
+          tree.loose.push(await new Promise((res, rej) => entry.file(res, rej)))
+        } catch {
+          unreadable++
+        }
+      }
     }
     setActionNotice(null)
-    enqueueFolderUpload(items)
+    if (unreadable) setActionError(`${unreadable} item${unreadable > 1 ? 's' : ''} could not be read from your computer.`)
+    enqueueFolderUpload(tree)
   }
 
-  async function runFolderUpload(items, rootParent) {
-    setActionError(null)
-    const picked = items.map((i) => i.file)
-    const relMap = new Map(items.map((i) => [i.file, i.rel]))
-    const relPath = (f) => relMap.get(f)
+  async function runFolderUpload(tree, rootParent) {
+    const count = (n) => n.files.length + n.dirs.reduce((s, d) => s + count(d), 0)
+    const countDirs = (n) => 1 + n.dirs.reduce((s, d) => s + countDirs(d), 0)
+    const totalFiles = tree.loose.length + tree.roots.reduce((s, n) => s + count(n), 0)
+    const totalDirs = tree.roots.reduce((s, n) => s + countDirs(n), 0)
 
-    // Unique directory paths, parents before children.
-    const dirSet = new Set()
-    for (const f of picked) {
-      const parts = relPath(f).split('/')
-      parts.pop()
-      for (let i = 1; i <= parts.length; i++) dirSet.add(parts.slice(0, i).join('/'))
-    }
-    const dirs = Array.from(dirSet).sort((a, b) => a.split('/').length - b.split('/').length)
-
-    const total = picked.length
-    let done = 0
-    let failed = 0
-    const folderIds = new Map()
-    setActionNotice(`Preparing folders…`)
-
+    // 1. Create every folder (including empty ones) under its real parent and
+    //    collect one upload job per file, pointing at the folder it belongs to.
+    const jobs = tree.loose.map((file) => ({ file, parentId: rootParent }))
+    setActionNotice('Creating folders…')
     try {
-      for (const dir of dirs) {
-        const parts = dir.split('/')
-        const name = parts[parts.length - 1]
-        const parentId = parts.length > 1 ? folderIds.get(parts.slice(0, -1).join('/')) : rootParent
-        const folder = await createFolder(accessToken, name, parentId)
-        folderIds.set(dir, folder.id)
-        if (parts.length === 1) setFiles((list) => [folder, ...(list || [])])
+      const build = async (node, parentId, isTop) => {
+        const folder = await createFolder(accessToken, node.name, parentId)
+        if (isTop) setFiles((list) => [folder, ...(list || [])])
+        for (const file of node.files) jobs.push({ file, parentId: folder.id })
+        for (const sub of node.dirs) await build(sub, folder.id, false)
       }
+      for (const node of tree.roots) await build(node, rootParent, true)
     } catch (err) {
       setActionNotice(null)
       setActionError(`Could not create folders: ${err.message}`)
       return
     }
 
-    setActionNotice(`Uploading 0 of ${total} files…`)
-    const queue = picked.slice()
+    // 2. Upload files three at a time, retrying each a couple of times.
+    let done = 0
+    const failedNames = []
+    setActionNotice(`Uploading 0 of ${totalFiles} files…`)
+    const queue = jobs.slice()
     const worker = async () => {
       while (queue.length) {
-        const file = queue.shift()
-        const parts = relPath(file).split('/')
-        parts.pop()
-        const parentId = parts.length ? folderIds.get(parts.join('/')) : rootParent
-        try {
-          await uploadFile(accessToken, file, parentId)
-        } catch {
-          failed++
+        const { file, parentId } = queue.shift()
+        let ok = false
+        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+          try {
+            await uploadFile(accessToken, file, parentId)
+            ok = true
+          } catch {
+            await new Promise((r) => setTimeout(r, 600 * (attempt + 1)))
+          }
         }
+        if (!ok) failedNames.push(file.name)
         done++
-        setActionNotice(`Uploading ${done} of ${total} files…`)
+        setActionNotice(`Uploading ${done} of ${totalFiles} files…`)
       }
     }
     await Promise.all([worker(), worker(), worker()])
 
     setActionNotice(null)
-    if (failed) setActionError(`${failed} of ${total} file${total > 1 ? 's' : ''} failed to upload.`)
-    else setActionNotice(`Uploaded ${total} file${total > 1 ? 's' : ''}.`)
     refreshCurrentFolder()
+    const summary = `${totalFiles - failedNames.length} of ${totalFiles} files uploaded into ${totalDirs} folder${totalDirs === 1 ? '' : 's'}.`
+    if (failedNames.length) {
+      const shown = failedNames.slice(0, 3).join(', ')
+      setActionError(`${summary} Failed: ${shown}${failedNames.length > 3 ? '…' : ''}`)
+    } else {
+      setActionNotice(summary)
+    }
   }
 
   async function handleDeleteSelected() {
