@@ -2861,3 +2861,31 @@ button:not(:disabled):active, input[type="button"]:active, input[type="submit"]:
   .note-card-swipe-wrapper { margin-bottom: 14px; }
   .note-grid { column-gap: 14px; }
 }
+
+/* ---------- Drive cards (folders and files) use the same flat card look ---------- */
+/* They are <button>s, so the app-wide pill-button rule would otherwise round them into capsules. */
+button.drive-card {
+  border-radius: 14px !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  padding-bottom: 14px;
+}
+button.drive-card:not(:disabled):active { transform: none; box-shadow: none !important; }
+button.drive-card.drive-card-selected { box-shadow: 0 0 0 2px #1A73E8 inset !important; }
+.drive-card h3 { font-size: 16px; margin: 0 0 4px; }
+.drive-card .drive-card-meta { font-size: 13px !important; }
+.drive-card .drive-card-icon-wrap {
+  width: auto;
+  margin: -18px -16px 14px;
+  padding: 30px 0;
+  border-radius: 13px 13px 0 0;
+}
+.note-card.drive-card > img {
+  width: calc(100% + 32px);
+  margin: -18px -16px 14px;
+  max-width: none;
+  border-radius: 13px 13px 0 0;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.drive-card.drive-card-uploading { border-radius: 14px; }
