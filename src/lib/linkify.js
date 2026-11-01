@@ -84,3 +84,63 @@ export function linkifyHtml(html) {
   Array.from(container.childNodes).forEach(linkifyNode)
   return container.innerHTML
 }
+
+// Every link in a note's HTML, in order, de-duplicated. Used for the link
+// rows at the bottom of a note card. Text is read node by node so URLs on
+// separate lines never run together.
+export function extractUrls(html) {
+  if (!html) return []
+  const container = document.createElement('div')
+  container.innerHTML = html
+  const seen = new Set()
+  const urls = []
+  const add = (href) => {
+    const key = href.replace(/\/+$/, '').toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    urls.push(href)
+  }
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.nodeValue
+      URL_PATTERN.lastIndex = 0
+      let match
+      while ((match = URL_PATTERN.exec(text))) {
+        let raw = match[0]
+        const trailing = raw.match(TRAILING_PUNCT)
+        if (trailing) raw = raw.slice(0, raw.length - trailing[0].length)
+        if (raw && isLikelyUrl(raw)) add(toHref(raw))
+      }
+      return
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return
+    if (node.tagName === 'A') {
+      const href = node.getAttribute('href') || ''
+      if (/^https?:\/\//i.test(href)) add(href)
+      return
+    }
+    Array.from(node.childNodes).forEach(walk)
+  }
+  Array.from(container.childNodes).forEach(walk)
+  return urls
+}
+
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1)
+
+// A readable two-line label for a link, built from the URL alone (no network
+// request, so nothing about the note leaves the device): a title and a host.
+export function linkDisplay(url) {
+  let u
+  try { u = new URL(url) } catch { return { host: url, title: url } }
+  const host = u.hostname.replace(/^www\./, '')
+  const site = cap(host.split('.')[0])
+  const segs = u.pathname.split('/').filter(Boolean)
+  if (!segs.length) return { host, title: site }
+  let last = segs[segs.length - 1]
+  try { last = decodeURIComponent(last) } catch { /* keep raw */ }
+  last = last.replace(/\.(git|html?|php)$/i, '')
+  // Opaque ids (share links, uuids, hashes) make poor titles.
+  if (/^[0-9a-f-]{8,}$/i.test(last) || /^\d+$/.test(last)) return { host, title: site }
+  last = last.replace(/[-_+]+/g, ' ').trim()
+  return { host, title: last ? cap(last) : site }
+}

@@ -171,3 +171,10 @@ export function IconBulletList(p) { return (
 export function IconNumberedList(p) { return (
   <svg viewBox="0 0 24 24" width="17" height="17" {...base} {...p}><path d="M10 6h10M10 12h10M10 18h10" /><text x="1.5" y="8" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">1</text><text x="1.5" y="14" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">2</text><text x="1.5" y="20" fontSize="6.5" fill="currentColor" stroke="none" fontFamily="sans-serif">3</text></svg>
 )}
+
+export function IconExternal(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+)}
+export function IconGlobe(p) { return (
+  <svg viewBox="0 0 24 24" width="20" height="20" {...base} {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18" /></svg>
+)}

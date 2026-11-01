@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { getNoteColors, NOTE_BACKGROUNDS } from '../constants.js'
+import { getNoteColors, NOTE_BACKGROUNDS, NOTE_BACKGROUND_BORDERS, ILLUSTRATED_BACKGROUNDS } from '../constants.js'
 import { IconBell, IconPin, IconUnpin, IconArchive, IconTrash, IconRestore, IconClose, IconFileDoc, IconShare, IconCheck, IconText } from './Icons.jsx'
 import ImageLightbox from './ImageLightbox.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { stripHtml } from '../lib/richText.js'
-import { linkifyHtml } from '../lib/linkify.js'
+import { linkifyHtml, extractUrls } from '../lib/linkify.js'
+import LinkChips from './LinkChips.jsx'
 import { AttachmentImg, AttachmentAudio, AttachmentLink } from './AttachmentMedia.jsx'
 import { fetchAttachmentBlob } from '../lib/fsImages.js'
 
@@ -33,6 +34,32 @@ export default function NoteCard({
 }) {
   const { theme } = useTheme()
   const NOTE_COLORS = getNoteColors(theme)
+  const isLight = theme === 'light'
+  const bgName = note.background && note.background !== 'none' ? note.background : null
+  const art = bgName ? NOTE_BACKGROUNDS[bgName] : null
+  // The pastel illustrations are drawn for a light page; dim them under the dark themes.
+  const cardBackground = art
+    ? (ILLUSTRATED_BACKGROUNDS.has(bgName) && !isLight
+        ? `linear-gradient(rgba(0,0,0,0.62), rgba(0,0,0,0.62)), ${art}`
+        : art)
+    : NOTE_COLORS[note.color] || NOTE_COLORS.default
+  // Thin outline in a deeper shade of the card's own colour (light theme only;
+  // the other themes keep their existing border colour).
+  let cardBorderColor
+  if (isLight) {
+    if (bgName && NOTE_BACKGROUND_BORDERS[bgName]) cardBorderColor = NOTE_BACKGROUND_BORDERS[bgName]
+    else if (!bgName && note.color && note.color !== 'default' && NOTE_COLORS[note.color]) {
+      cardBorderColor = `color-mix(in srgb, ${NOTE_COLORS[note.color]} 76%, #000)`
+    }
+  }
+  const linkUrls = useMemo(() => extractUrls(note.text), [note.text])
+  const hasLinks = linkUrls.length > 0
+  // Bottom-anchored art should end above the link rows, not sit behind them.
+  const linkBlockHeight = hasLinks ? Math.min(linkUrls.length, 3) * 61 + (linkUrls.length > 3 ? 42 : 0) + 13 : 0
+  const liftArt = hasLinks && (bgName === 'grocery' || bgName === 'noodlebowl')
+  const artPosition = liftArt
+    ? `${cardBackground !== art ? '0 0, ' : ''}center calc(100% - ${linkBlockHeight}px)`
+    : undefined
   const overdue = note.reminderAt && new Date(note.reminderAt) < new Date()
   const noteLabels = (note.labels || []).map((id) => labels.find((l) => l.id === id)).filter(Boolean)
   const images = note.images || []
@@ -239,12 +266,11 @@ export default function NoteCard({
     <motion.div
       layoutId={`note-${note.id}`}
       ref={cardRef}
-      className={`note-card ${selected ? 'note-card-selected' : ''}`}
+      className={`note-card ${selected ? 'note-card-selected' : ''} ${hasLinks ? 'note-card-has-links' : ''}`}
       style={{
-        background:
-          note.background && note.background !== 'none'
-            ? NOTE_BACKGROUNDS[note.background]
-            : NOTE_COLORS[note.color] || NOTE_COLORS.default,
+        background: cardBackground,
+        backgroundPosition: artPosition,
+        borderColor: cardBorderColor,
         // x (not a raw transform string) so this composes with framer's own
         // layout-projection transform instead of clobbering it.
         x: swipeX,
@@ -272,16 +298,8 @@ export default function NoteCard({
         </div>
       )}
 
-      {note.reminderAt && (
-        <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
-          <IconBell width="12" height="12" /> {formatReminder(note.reminderAt)}
-        </div>
-      )}
-
-      {note.title && <h3>{note.title}</h3>}
-
       {images.length === 1 && (
-        <div className={`note-card-image-wrap ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}>
+        <div className="note-card-image-wrap">
           <AttachmentImg
             src={images[0]}
             optimize={null}
@@ -298,7 +316,7 @@ export default function NoteCard({
 
       {images.length > 1 && (
         <div
-          className={`note-card-collage collage-${Math.min(images.length, 6)} ${!note.title && !note.reminderAt ? 'note-card-media-bleed' : ''}`}
+          className={`note-card-collage collage-${Math.min(images.length, 6)}`}
           onClick={(e) => e.stopPropagation()}
         >
           {images.slice(0, 6).map((src, i) => (
@@ -311,6 +329,8 @@ export default function NoteCard({
           ))}
         </div>
       )}
+
+      {note.title && <h3>{note.title}</h3>}
 
       {note.audio?.length > 0 && (
         <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '6px 0' }}>
@@ -361,8 +381,13 @@ export default function NoteCard({
         </div>
       )}
 
-      {noteLabels.length > 0 && (
+      {(noteLabels.length > 0 || note.reminderAt) && (
         <div className="note-labels">
+          {note.reminderAt && (
+            <div className={`reminder-tag ${overdue ? 'overdue' : ''}`}>
+              <IconBell width="12" height="12" /> {formatReminder(note.reminderAt)}
+            </div>
+          )}
           {noteLabels.map((l) => (
             <span className="label-chip" key={l.id}>{l.name}</span>
           ))}
@@ -403,6 +428,8 @@ export default function NoteCard({
           )}
         </div>
       )}
+
+      <LinkChips urls={linkUrls} />
     </motion.div>
     </div>
 

@@ -90,7 +90,105 @@ function skyline(buildings, body, windows) {
 // gradients/patterns (no image assets), so they're crisp at any size,
 // theme-safe, and don't need network or storage. When a note has a
 // background set, it takes precedence over `color` for display.
+
+// ---- Illustrated backgrounds (flat vector art, drawn as inline SVG) ----
+function svgBg(svg, size, pos, base) {
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${pos} / ${size} no-repeat, ${base}`
+}
+
+// A feathery leaf frond: a stem with paired leaflets along it.
+function frond(x, y, len, deg, fill) {
+  const rad = ((deg - 90) * Math.PI) / 180
+  const steps = Math.floor(len / 8)
+  let out = ''
+  for (let i = 1; i <= steps; i++) {
+    const t = i * 8
+    const cx = x + Math.cos(rad) * t
+    const cy = y + Math.sin(rad) * t
+    const size = 7 - (i / steps) * 3.5
+    for (const side of [-1, 1]) {
+      out += `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(size * 1.6).toFixed(1)}" ry="${(size * 0.55).toFixed(1)}" transform="rotate(${(deg - 90 + side * 55).toFixed(0)} ${cx.toFixed(1)} ${cy.toFixed(1)}) translate(${(side * size * 1.4).toFixed(1)} 0)" fill="${fill}"/>`
+    }
+  }
+  const ex = x + Math.cos(rad) * len
+  const ey = y + Math.sin(rad) * len
+  return out + `<line x1="${x}" y1="${y}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${fill}" stroke-width="1.6"/>`
+}
+
+// Round tree: trunk plus a cluster of canopy circles.
+function tree(x, groundY, h, canopy, trunk) {
+  const r = h * 0.2
+  const top = groundY - h
+  return `<rect x="${x - 2.5}" y="${groundY - h * 0.45}" width="5" height="${h * 0.45}" fill="${trunk}"/>` +
+    `<circle cx="${x}" cy="${top + r * 1.4}" r="${r * 1.5}" fill="${canopy}"/>` +
+    `<circle cx="${x - r * 1.1}" cy="${top + r * 2.4}" r="${r * 1.2}" fill="${canopy}"/>` +
+    `<circle cx="${x + r * 1.1}" cy="${top + r * 2.4}" r="${r * 1.25}" fill="${canopy}"/>` +
+    `<circle cx="${x}" cy="${top + r * 3.2}" r="${r * 1.3}" fill="${canopy}"/>`
+}
+
+const GROCERY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" preserveAspectRatio="xMidYMax meet">
+  <g opacity=".75">
+    ${frond(142, 140, 96, -34, '#9DAA7E')}${frond(142, 140, 118, -14, '#A9B58B')}
+    ${frond(142, 140, 108, 6, '#95A476')}${frond(142, 140, 100, 26, '#A9B58B')}${frond(142, 140, 84, 44, '#9DAA7E')}
+  </g>
+  <path d="M0 146 Q48 128 100 142 T200 136 V170 H0Z" fill="#E3A94C"/>
+  <path d="M0 158 Q60 146 110 156 T200 152 V170 H0Z" fill="#D4742E"/>
+  <circle cx="20" cy="152" r="21" fill="#DE8F3F"/><circle cx="14" cy="145" r="5" fill="#EBB070" opacity=".7"/>
+  <circle cx="62" cy="158" r="23" fill="#C4522C"/><path d="M62 136q2-9 8-12" stroke="#7B5A2E" stroke-width="2" fill="none"/>
+  <ellipse cx="104" cy="160" rx="21" ry="17" fill="#E6B350"/>
+  <circle cx="146" cy="157" r="21" fill="#A7AA52"/><ellipse cx="152" cy="143" rx="7" ry="3.2" fill="#8E9B46" transform="rotate(-30 152 143)"/>
+  <circle cx="184" cy="154" r="22" fill="#D7783A"/>
+</svg>`
+
+const PARKLAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300" preserveAspectRatio="xMidYMax slice">
+  <g fill="#C8D5B6" opacity=".85">
+    <rect x="62" y="196" width="16" height="104"/><rect x="80" y="170" width="20" height="130"/>
+    <rect x="102" y="204" width="15" height="96"/><rect x="119" y="182" width="18" height="118"/><rect x="40" y="214" width="20" height="86"/>
+  </g>
+  <g fill="#DCE5CD" opacity=".9">
+    <rect x="85" y="180" width="3" height="3"/><rect x="92" y="180" width="3" height="3"/><rect x="85" y="190" width="3" height="3"/>
+    <rect x="92" y="190" width="3" height="3"/><rect x="123" y="192" width="3" height="3"/><rect x="129" y="192" width="3" height="3"/>
+    <rect x="67" y="206" width="3" height="3"/><rect x="67" y="216" width="3" height="3"/>
+  </g>
+  <g opacity=".5">${tree(24, 300, 250, '#A3B98E', '#8FA37C')}${tree(176, 300, 290, '#9DB488', '#8FA37C')}</g>
+  <g opacity=".55">${tree(58, 300, 120, '#8DA677', '#7E946B')}${tree(150, 300, 150, '#8DA677', '#7E946B')}</g>
+  <path d="M0 262 Q70 238 130 262 T200 250 V300 H0Z" fill="#A9BE96" opacity=".8"/>
+  <path d="M0 282 Q80 262 200 280 V300 H0Z" fill="#96AD82" opacity=".85"/>
+</svg>`
+
+const NOODLES_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 170" preserveAspectRatio="xMidYMax meet">
+  <g fill="#FBEFE6" opacity=".95">
+    <rect x="150" y="48" width="9" height="62" rx="4.5" transform="rotate(32 154 79)"/>
+    <rect x="172" y="8" width="3" height="30" rx="1.5" transform="rotate(32 173 23)"/><rect x="178" y="6" width="3" height="32" rx="1.5" transform="rotate(32 179 22)"/>
+    <rect x="184" y="6" width="3" height="32" rx="1.5" transform="rotate(32 185 22)"/><rect x="190" y="8" width="3" height="30" rx="1.5" transform="rotate(32 191 23)"/>
+    <path d="M168 30 Q182 40 196 30 L190 52 Q182 56 174 52Z" transform="rotate(32 182 40)"/>
+  </g>
+  <ellipse cx="100" cy="112" rx="92" ry="38" fill="#F2DFC9"/>
+  <g fill="none" stroke="#E5CBAD" stroke-width="2.2" stroke-linecap="round">
+    <path d="M20 108 Q60 80 100 98 T184 100"/><path d="M26 120 Q70 92 112 108 T180 114"/>
+    <path d="M40 98 Q80 118 120 94 T170 96"/><path d="M34 112 Q90 134 150 112"/><path d="M52 88 Q96 70 140 88"/>
+  </g>
+  <g fill="#8EA66E"><ellipse cx="62" cy="92" rx="9" ry="4" transform="rotate(-25 62 92)"/><ellipse cx="74" cy="86" rx="8" ry="3.4" transform="rotate(20 74 86)"/></g>
+  <circle cx="48" cy="118" r="15" fill="#E8956B"/><circle cx="43" cy="113" r="4.5" fill="#F3B792" opacity=".8"/>
+  <path d="M0 116 H200 C200 156 160 168 100 168 C40 168 0 156 0 116Z" fill="#46709A"/>
+  <path d="M0 116 H200 C199 122 198 126 196 130 H4 C2 126 1 122 0 116Z" fill="#5B86B0"/>
+</svg>`
+
+export const ILLUSTRATED_BACKGROUNDS = new Set(['grocery', 'parkland', 'noodlebowl'])
+
+// Outline colours that match each illustrated card (Keep draws a thin
+// coloured edge around these instead of the neutral grey border).
+export const NOTE_BACKGROUND_BORDERS = {
+  grocery: '#C4BB9F',
+  parkland: '#A9B79B',
+  noodlebowl: '#E39272',
+}
+
 export const NOTE_BACKGROUNDS = {
+  // --- Illustrated cards ---
+  grocery: svgBg(GROCERY_SVG, '100% auto', 'center bottom', '#EEE8D6'),
+  parkland: svgBg(PARKLAND_SVG, 'cover', 'center bottom', '#EEE2E1'),
+  noodlebowl: svgBg(NOODLES_SVG, '100% auto', 'center bottom', '#F4D3C7'),
   sunset: 'linear-gradient(135deg, #FF9A76 0%, #FF6B9D 55%, #A55EEA 100%)',
   ocean: 'linear-gradient(135deg, #0093E9 0%, #80D0C7 100%)',
   aurora: 'linear-gradient(120deg, #00F5A0 0%, #00D9F5 100%)',
@@ -196,6 +294,9 @@ export const NOTE_BACKGROUNDS = {
 }
 
 export const NOTE_BACKGROUND_LABELS = {
+  grocery: 'Fresh produce',
+  parkland: 'Park & city',
+  noodlebowl: 'Noodle bowl',
   sunset: 'Sunset',
   ocean: 'Ocean',
   aurora: 'Aurora',
